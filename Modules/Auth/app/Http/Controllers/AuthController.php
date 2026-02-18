@@ -13,27 +13,21 @@ class AuthController extends Controller
     ){}
     public function all(Request $request)
     {
-        $this->service->all($request->string('profile'));
+        $this->service->all($request->input('profile'));
     }
 
     public function login(Request $request)
     {
-        return $this->service->login($request->string('profile'));
-
+        return $this->service->login($request->input('profile'));
     }
 
     public function register(Request $request)
     {
-        $this->service->register($request->string('profile'));
+        $this->service->register($request->input('profile'));
     }
 
     public function logout(Request $request)
     {
-        $this->service->logout($request->string('profile'));
-    }
-
-    public function report(Request $request)
-    {
-        $this->service->report($request->string('profile'));
+        $this->service->logout($request->input('profile'));
     }
 }
