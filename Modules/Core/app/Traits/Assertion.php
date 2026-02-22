@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Traits;
 
+use App\Contracts\TestContext;
 use Playwright\Page\PageInterface;
 use RuntimeException;
 
@@ -93,4 +94,10 @@ trait Assertion
 
         throw new RuntimeException("Page title does not contain '{$expected}' after {$timeout}ms");
     }
+
+    public function stepAssert(callable $assertion, TestContext $context, string $stepName, bool $critical = true)
+    {
+        return $this->step($stepName, fn() => $assertion(), null, $critical, $context);
+    }
+
 }

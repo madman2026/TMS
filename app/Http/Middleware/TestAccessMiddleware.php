@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Middleware;
 
+use App\Contracts\RequestOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,24 +13,20 @@ class TestAccessMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $data = [
-            'profile' => $request->header('X-Profile'),
-            'secret'  => $request->header('X-Secret'),
-        ];
+        $profileName = $request->header('X-Profile', 'primary');
 
-        Validator::validate($data, [
-            'profile' => ['required', 'string'],
-            'secret'  => ['required', 'string'],
-        ]);
+        $profile = Profile::where('name', $profileName)->firstOrFail();
+        $options = app(RequestOptions::class);
+        $profileRuntime = clone $profile;
 
-        $profile = Profile::where('name', $data['profile'])->first();
+        $data = $profileRuntime->data;
 
-        if (!$profile || !Hash::check($data['secret'], $profile->secret)) {
-            abort(403, 'Invalid profile or secret');
-        }
+        $data['browser']['driver'] = $options->browser->value ?? $data['browser']['driver'];
+        $data['global']['speed'] = $options->speed->value ?? $data['global']['internet_speed'];
+        $profileRuntime->data = $data;
 
-        $request->attributes->set('auth_profile', $profile);
-
+        $request->attributes->set('profile', $profileRuntime);
         return $next($request);
     }
+
 }

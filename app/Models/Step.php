@@ -2,29 +2,30 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Profile extends Model
+class Step extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProfileFactory> */
+    /** @use HasFactory<\Database\Factories\StepFactory> */
     use HasFactory;
 
     protected $fillable = [
         'name',
+        'duration',
+        'description',
         'data'
     ];
 
     protected function casts()
     {
         return [
-            'data' => 'array',
+            'data' => 'array'
         ];
     }
 
-    public function tests()
+    public function test()
     {
-        return $this->hasMany(Test::class);
+        return $this->belongsTo(Test::class);
     }
 }

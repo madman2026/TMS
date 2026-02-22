@@ -15,38 +15,29 @@ abstract class BaseService
         string $successMessage = "Operation Completed Successfully!",
         bool $useTransaction = true,
     ): ServiceResponse {
-        try {
-            $result = $useTransaction
-                ? DB::transaction($callback)
-                : $callback();
+    $response = new ServiceResponse(
+        status: true,
+        message: $successMessage,
+        data: null
+    );
 
-            return ServiceResponse::success($result, $successMessage);
-        }
-        catch (NotFoundHttpException $e) {
-            Log::warning("Resource not found.", [
-                "exception" => $e,
-                "trace" => $e->getTraceAsString(),
-                "user_id" => auth()->id() ?? null,
-            ]);
+    try {
+        $runner = fn () => $callback($response);
 
-            return ServiceResponse::error(
-                "Resource not found!",
-                env("APP_DEBUG") ? $e->getMessage() : null,
-            );
-        }
-        catch (Throwable $e) {
-            Log::error($errorMessage, [
-                "exception" => $e,
-                "trace" => $e->getTraceAsString(),
-                "user_id" => auth()->id() ?? null,
-            ]);
+        $result = $useTransaction
+            ? DB::transaction($runner)
+            : $runner();
 
-            report($e);
+        $response->data = $result;
 
-            return ServiceResponse::error(
-                $errorMessage,
-                env("APP_DEBUG") ? $e->getMessage() : null,
-            );
-        }
+        return $response;
+    } catch (Throwable $e) {
+        report($e);
+
+        return ServiceResponse::error(
+            $errorMessage,
+            config('app.debug') ? $e->getMessage() : null
+        );
     }
+}
 }

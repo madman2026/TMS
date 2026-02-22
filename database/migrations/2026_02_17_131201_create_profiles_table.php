@@ -14,8 +14,7 @@ return new class extends Migration
         Schema::create('profiles', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->text('secret');
-            $table->json('detail');
+            $table->json('detail')->nullable();
             $table->timestamps();
         });
     }

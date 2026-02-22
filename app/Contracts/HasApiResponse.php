@@ -15,10 +15,10 @@ trait HasApiResponse
         ], $statusCode);
     }
 
-    public static function error(string $message = 'Error', $errors = null, int $statusCode = 400)
+    public static function error(string $message = 'Error', $errors = null, int $statusCode = 500)
     {
         return response()->json([
-            'status'  => 'error',
+            'status'  => 'failed',
             'message' => $message,
             'errors'  => $errors
         ], $statusCode);
@@ -35,7 +35,7 @@ trait HasApiResponse
 
     protected function paginatedResponse(
         $paginator,
-        string $message = 'Success'
+        string $message = 'success'
     ): JsonResponse {
         return response()->json([
             'status'  => 'success',

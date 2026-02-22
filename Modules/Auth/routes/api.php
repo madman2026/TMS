@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Auth\Http\Controllers\AuthController;
-
+// ->middleware(['api' , 'auth:sanctum'])
 Route::prefix('auth')->as('auth.')->group(function () {
     Route::get('/', [AuthController::class , 'all'])->name('all');
     Route::get('/login', [AuthController::class , 'login'])->name('login');

@@ -1,7 +1,6 @@
 <?php
 
-use App\Models\Profile;
-use App\TestStatusEnum;
+use App\Models\Test;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,12 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('tests', function (Blueprint $table) {
+        Schema::create('steps', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(Profile::class)->constrained('profiles')->cascadeOnDelete();
-            $table->string('status')->default(TestStatusEnum::PENDING);
-            $table->string('duration')->nullable();
             $table->string('name');
+            $table->string('duration');
+            $table->foreignIdFor(Test::class)->constrained('tests')->cascadeOnDelete();
+            $table->text('description')->nullable();
             $table->json('data')->nullable();
             $table->timestamps();
         });
@@ -29,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('tests');
+        Schema::dropIfExists('steps');
     }
 };

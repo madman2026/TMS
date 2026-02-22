@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ResolveRequestOptionsMiddleware;
 use App\Http\Middleware\TestAccessMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(ResolveRequestOptionsMiddleware::class);
         $middleware->append(TestAccessMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Http\Requests;
+namespace {{namespace}};
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\Contracts\ApiFormRequest;
 
-class UpdateTestRequest extends FormRequest
+class {{class}} extends ApiFormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
