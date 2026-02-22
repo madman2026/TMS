@@ -2,10 +2,26 @@
 
 namespace App;
 
+use App\Contracts\Device;
+
 enum DeviceTypeEnum: string
 {
-    case MOBILE='mobile';
+    case ANDROID_MOBILE='android-mobile';
+    case ANDROID_TABLET='android-tablet';
+    case IOS_MOBILE='ios-mobile';
+    case IOS_TABLET='ios-tablet';
+    case LAPTOP= 'laptop';
     case DESKTOP='desktop';
-    case TABLET='tablet';
-    case ALL='all';
+
+    public function settings(): array
+    {
+        return match ($this) {
+            self::ANDROID_MOBILE => Device::androidMobile(),
+            self::ANDROID_TABLET => Device::androidTablet(),
+            self::IOS_MOBILE => Device::iosMobile(),
+            self::IOS_TABLET => Device::iosTablet(),
+            self::LAPTOP => Device::laptop(),
+            self::DESKTOP => Device::desktop(),
+        };
+    }
 }

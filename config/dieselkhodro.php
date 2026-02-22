@@ -1,6 +1,6 @@
 <?php
 
 return [
-    'url' => env('DK__ECOMMERCE_URL' , 'http://192.168.1.9:8067/'),
+    'url' => env('DK__ECOMMERCE_URL' , 'https://www.dieselkhodro.com//'),
     'token' => env('DK_TOKEN')
 ];

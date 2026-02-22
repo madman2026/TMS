@@ -2,6 +2,7 @@
 
 namespace App\Contracts;
 
+use App\DeviceTypeEnum;
 use Playwright\Page\PageInterface;
 use App\Models\Profile;
 use App\Models\Test;
@@ -16,6 +17,7 @@ class TestContext
     public BrowserContextInterface $browser;
     public PageInterface $page;
     public Test $test;
+    public DeviceTypeEnum $device;
     public array $cookies = [];
 
     public function __construct(Profile $profile, Test $test)
@@ -25,16 +27,14 @@ class TestContext
         $this->test = $test;
         $config = $profile->data;
         $customize_profile = $request->attributes->get('profile_customize');
-        $browserSettings = $config?->browser?->settings ?? ['headless' => false];
         $driver = $customize_profile?->browser?->value ?? $config?->browser?->driver ?? 'chrome';
-
-        $this->browser = match ($driver) {
-            'chrome' => Playwright::chromium($browserSettings),
-            'firefox' => Playwright::firefox($browserSettings),
-            'safari' => Playwright::webkit($browserSettings),
-            default => Playwright::chromium($browserSettings),
-        };
-
+        $this->device = $customize_profile?->device ?? $profile->device ?? DeviceTypeEnum::DESKTOP;
+        $contextOptions = array_merge(
+            ['headless' => false],
+            $this->device->settings(),
+            $config?->browser?->settings ?? []
+        );
+        $this->browser = BrowserFactory::make($driver, $contextOptions);
         $this->page = $this->browser->newPage();
     }
 }

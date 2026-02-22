@@ -31,7 +31,7 @@ class LoginTestAction extends BaseAction
             $page->locator($passwordSelector)->fill($password);
             $page->locator($submitSelector)->click();
             $this->assertTextContains($page , 'a[href="/profile"]' , 'سید محمد حسین هاشمی' , 1);
-            dd($context->browser->cookies());
+            $cookies =$context->browser->cookies();
 
         }, 'Login page and assert profile link', true, $context);
     }

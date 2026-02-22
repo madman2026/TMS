@@ -2,14 +2,15 @@
 
 namespace App\Contracts;
 
-use App\BrowserTypeEnum;
+use App\DriverTypeEnum;
 use App\InternetSpeedEnum;
-use Playwright\Browser\Browser;
+use App\DeviceTypeEnum;
 
 class RequestOptions
 {
     public function __construct(
-        public readonly BrowserTypeEnum $browser,
+        public readonly DriverTypeEnum $browser,
+        public readonly DeviceTypeEnum $device,
         public readonly InternetSpeedEnum $speed,
     ){}
 }

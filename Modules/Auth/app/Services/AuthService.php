@@ -53,12 +53,10 @@ class AuthService extends BaseService
             $test = $profile->tests()->create([
                 'name' => 'login test'
             ]);
-
             $context = new TestContext(
                 profile: $profile,
                 test: $test
             );
-
             $result = $this->loginAction->handle($context);
 
             return [
@@ -73,12 +71,9 @@ class AuthService extends BaseService
                 'name' => 'login test'
             ]);
 
-            $context = new TestContext(
-                profile: $profile,
-                test: $test
-            );
-
-            $this->registerAction->handle($context);
+            return [
+                'register test' => $this->registerAction->handle(new TestContext(profile: $profile,test: $test))
+            ];
         } , 'register test failed!');
     }
     public function logout(?Profile $profile) {

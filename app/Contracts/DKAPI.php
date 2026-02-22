@@ -12,11 +12,20 @@ class DKAPI
             ->post(config('dieselkhodro.url') . 'e2e/auth/register', [
                 'mobile' => $number,
             ]);
-
         if ($response->failed()) {
             throw new \Exception('API request for get OTP failed: ' . $response->body());
         }
 
         return $response->json()['result']['otp'];
+    }
+
+    public static function getCityIds(int $stateID)
+    {
+        $response = Http::get(config('dieselkhodro.url') . 'get-province-cities' , ['state_id' => $stateID]);
+        if ($response->failed()) {
+            throw new \Exception('API request for get cities id failed: ' . $response->body());
+        }
+
+        return $response->json()['cities'];
     }
 }

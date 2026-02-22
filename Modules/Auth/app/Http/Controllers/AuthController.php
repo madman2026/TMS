@@ -32,7 +32,11 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        $this->service->register($request->attributes->get('profile'));
+        $result = $this->service->register($request->attributes->get('profile'));
+
+        return $result->status
+            ? $this->success($result->data , $result->message)
+            : $this->error($result->message , $result->data);
     }
 
     public function logout(Request $request)
