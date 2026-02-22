@@ -1,9 +1,11 @@
 <?php
 
+use App\DeviceTypeEnum;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-
+use App\DriverTypeEnum;
+use App\InternetSpeedEnum;
 return new class extends Migration
 {
     /**
@@ -14,7 +16,10 @@ return new class extends Migration
         Schema::create('profiles', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->json('detail')->nullable();
+            $table->json('extra')->nullable();
+            $table->sting('driver')->default(DriverTypeEnum::CHROME);
+            $table->string('internet_speed')->default(InternetSpeedEnum::NORMAL);
+            $table->string('device')->default(DeviceTypeEnum::DESKTOP);
             $table->timestamps();
         });
     }

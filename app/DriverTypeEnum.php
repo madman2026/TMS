@@ -2,7 +2,7 @@
 
 namespace App;
 
-enum BrowserTypeEnum: string
+enum DriverTypeEnum: string
 {
     case CHROME='chrome';
     case FIREFOX='firefox';

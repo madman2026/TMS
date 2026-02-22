@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\DeviceTypeEnum;
+use App\DriverTypeEnum;
+use App\InternetSpeedEnum;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,13 +16,19 @@ class Profile extends Model
 
     protected $fillable = [
         'name',
-        'data'
+        'extra',
+        'device',
+        'driver',
+        'internet_speed'
     ];
 
     protected function casts()
     {
         return [
-            'data' => 'array',
+            'extra' => 'array',
+            'driver' => DriverTypeEnum::class,
+            'device' => DeviceTypeEnum::class,
+            'internet_speed' => InternetSpeedEnum::class,
         ];
     }
 
