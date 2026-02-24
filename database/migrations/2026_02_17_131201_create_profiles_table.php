@@ -15,9 +15,10 @@ return new class extends Migration
     {
         Schema::create('profiles', function (Blueprint $table) {
             $table->id();
+            $table->foreignIdFor(\App\Models\User::class)->constrained('users')->cascadeOnDelete()->cascadeOnUpdate();
             $table->string('name')->unique();
             $table->json('extra')->nullable();
-            $table->sting('driver')->default(DriverTypeEnum::CHROME);
+            $table->string('driver')->default(DriverTypeEnum::CHROME);
             $table->string('internet_speed')->default(InternetSpeedEnum::NORMAL);
             $table->string('device')->default(DeviceTypeEnum::DESKTOP);
             $table->timestamps();

@@ -32,6 +32,10 @@ class Profile extends Model
         ];
     }
 
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
     public function tests()
     {
         return $this->hasMany(Test::class);
