@@ -2,6 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\DeviceTypeEnum;
+use App\DriverTypeEnum;
+use App\InternetSpeedEnum;
+use App\Models\Profile;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -15,13 +19,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-        $this->call([
-            ProfileSeeder::class
-        ]);
-        User::factory()->create([
+        $user = User::factory()->create([
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            'phone' => '09922926708',
+            'password' => '12345678',
+        ]);
+        Profile::factory()->for($user)->create([
+            'name' => 'primary',
+            'driver' => DriverTypeEnum::CHROME,
+            'device' => DeviceTypeEnum::DESKTOP,
+            'internet_speed' => InternetSpeedEnum::NORMAL
         ]);
     }
 }

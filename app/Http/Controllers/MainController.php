@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Profile;
-use Illuminate\Http\Request;
+use App\Http\Requests\RunAllTestRequest;
 use Modules\Auth\Services\AuthService;
 
 class MainController extends Controller
@@ -11,11 +10,17 @@ class MainController extends Controller
     public function __construct(
         public AuthService $auth_service,
     ){}
-    public function __invoke(Request $request)
+    public function __invoke(RunAllTestRequest $request)
     {
-        $auth_group_result = $this->auth_service->all($request->attributes->get('profile'));
-        return $result->status
-            ? $this->success($result->data , $result->message)
-            : $this->error($result->message , $result->data);
+        $result['auth group'] = $this->auth_service->all($request->attributes->get('profile'));
+        foreach ($result as $service_result)
+        {
+            if ($service_result->status)
+            {
+                continue;
+            }
+            return $this->error('tests failed' , $result);
+        }
+        return $this->success($result , 'testing successful');
     }
 }
