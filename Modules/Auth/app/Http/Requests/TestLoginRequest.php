@@ -3,6 +3,7 @@
 namespace Modules\Auth\Http\Requests;
 
 use App\Contracts\ApiFormRequest;
+use Illuminate\Support\Facades\Hash;
 
 class TestLoginRequest extends ApiFormRequest
 {
@@ -27,11 +28,16 @@ class TestLoginRequest extends ApiFormRequest
         ];
     }
 
-    public function prepareForValidation()
+    protected function prepareForValidation(): void
     {
-        if (empty($this->phone) && $this->string('phone'))
-            $this->attributes->set('phone' , $this->string('phone'));
-        if (empty($this->password) && $this->string('password'))
-            $this->attributes->set('password' , $this->string('password'));
+        if (!$this->has('phone') && $this->attributes->has('profile')) {
+            $profile = $this->attributes->get('profile');
+            $this->merge(['phone' => $profile->user->phone]);
+        }
+
+        if (!$this->has('password') && $this->attributes->has('profile')) {
+            $profile = $this->attributes->get('profile');
+            $this->merge(['password' => $profile->user->password]);
+        }
     }
 }
