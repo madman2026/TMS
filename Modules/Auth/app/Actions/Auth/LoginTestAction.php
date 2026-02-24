@@ -5,6 +5,7 @@ namespace Modules\Auth\Actions\Auth;
 use App\Contracts\BaseAction;
 use App\Contracts\StepResult;
 use App\Contracts\TestContext;
+use Illuminate\Support\Facades\Hash;
 use Modules\Core\Traits\Assertion;
 use Modules\Core\Traits\HasStep;
 class LoginTestAction extends BaseAction
@@ -17,8 +18,8 @@ class LoginTestAction extends BaseAction
     {
         return $this->step('login successfully', function() use ($context) {
             $page = $context->page;
-            $phone = '09922926708';
-            $password = '12345678';
+            $phone = request()->phone;
+            $password = request()->password;
             $phoneSelector = '#phone_inp';
             $passwordSelector = '#passinp';
             $submitSelector = '.btn-primary-custom';
