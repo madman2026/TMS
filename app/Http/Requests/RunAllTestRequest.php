@@ -23,15 +23,13 @@ class RunAllTestRequest extends ApiFormRequest
     }
     protected function prepareForValidation(): void
     {
-        $group = $this->input('group');
+        $group = $this->input('group' , $this->query('group'));
 
         if (is_string($group)) {
             $group = explode(',', $group);
         }
 
-        if (empty($group)) {
-            $this->merge(['group' => null]);
-        } else {
+        if (!empty($group)) {
             $this->merge(['group' => $group]);
         }
     }

@@ -13,7 +13,7 @@ class DKAPI
                 'mobile' => $number,
             ]);
         if ($response->failed()) {
-            throw new \Exception('API request for get OTP failed: ' . $response->body());
+            throw new \Exception('API request for get OTP failed: ' . json_decode($response->body())->message);
         }
 
         return $response->json()['result']['otp'];

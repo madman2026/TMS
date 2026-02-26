@@ -15,7 +15,7 @@ class CheckPhoneAndPassword
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $request->attributes->set('profile' , $request->attributes->get('profile')->with('user')->get()->toArray());
+        $request->attributes->set('profile' , $request->attributes->get('profile')->with('user')->get()->first());
         return $next($request);
     }
 }

@@ -25,4 +25,11 @@ class {{class}} extends ApiFormRequest
             //
         ];
     }
+    /**
+     * Body parameters for the request.
+     */
+    public function bodyParameters(): array
+    {
+        return [];
+    }
 }

@@ -40,4 +40,20 @@ class TestLoginRequest extends ApiFormRequest
             $this->merge(['password' => $profile->user->password]);
         }
     }
+    /**
+     * Body parameters for the request.
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'phone' => [
+                'description' => 'User phone number',
+                'example' => '09922926708',
+            ],
+            'password' => [
+                'description' => 'User account password',
+                'example' => '12345678',
+            ],
+        ];
+    }
 }

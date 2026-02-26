@@ -18,8 +18,8 @@ class LoginTestAction extends BaseAction
     {
         return $this->step('login successfully', function() use ($context) {
             $page = $context->page;
-            $phone = request()->phone;
-            $password = request()->password;
+            $phone = request()->attributes->get('profile')->user->phone;
+            $password = request()->attributes->get('profile')->user->password;
             $phoneSelector = '#phone_inp';
             $passwordSelector = '#passinp';
             $submitSelector = '.btn-primary-custom';
