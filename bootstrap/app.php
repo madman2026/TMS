@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckPhoneAndPassword;
 use App\Http\Middleware\ResolveRequestOptionsMiddleware;
 use App\Http\Middleware\TestAccessMiddleware;
 use Illuminate\Foundation\Application;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(ResolveRequestOptionsMiddleware::class);
         $middleware->append(TestAccessMiddleware::class);
+        $middleware->append(CheckPhoneAndPassword::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

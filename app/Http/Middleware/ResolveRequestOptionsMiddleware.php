@@ -3,11 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\DriverTypeEnum;
-use App\Contracts\RequestOptions;
 use App\DeviceTypeEnum;
 use App\InternetSpeedEnum;
 use Closure;
 use Illuminate\Http\Request;
+use Modules\Core\Contracts\RequestOptions;
 use Throwable;
 
 class ResolveRequestOptionsMiddleware
@@ -16,9 +16,9 @@ class ResolveRequestOptionsMiddleware
     {
         try{
             $options = new RequestOptions(
-                browser: DriverTypeEnum::from($request->query('browser' , 'chrome')),
-                device: DeviceTypeEnum::from($request->query('device' , 'desktop')),
-                speed: InternetSpeedEnum::from($request->query('speed' , 'normal'))
+                browser: DriverTypeEnum::from($request->string('browser' , 'chrome')),
+                device: DeviceTypeEnum::from($request->string('device' , 'desktop')),
+                speed: InternetSpeedEnum::from($request->string('speed' , 'normal'))
             );
 
             $request->attributes->set('profile_customize', $options);
@@ -26,6 +26,7 @@ class ResolveRequestOptionsMiddleware
             app()->instance(RequestOptions::class, $options);
 
         }catch (Throwable $e) {
+            report($e);
             abort(422 , 'invalid args!');
         }
 

@@ -4,6 +4,7 @@ namespace App\Contracts;
 
 use Throwable;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Contracts\StepResult;
 
 abstract class BaseAction
 {

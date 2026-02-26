@@ -4,7 +4,7 @@ namespace Modules\Auth\Actions\Auth;
 
 use App\Contracts\BaseAction;
 use App\Contracts\DKAPI;
-use App\Contracts\TestContext;
+use Modules\Core\Contracts\TestContext;
 use Modules\Core\Traits\Assertion;
 use Modules\Core\Traits\HasStep;
 

@@ -3,7 +3,7 @@
 namespace Modules\Auth\Services;
 
 use App\Contracts\BaseService;
-use App\Contracts\TestContext;
+use Modules\Core\Contracts\TestContext;
 use App\Exceptions\TestFailedException;
 use App\Models\Profile;
 use App\Models\Test;

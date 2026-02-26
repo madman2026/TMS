@@ -3,8 +3,9 @@
 namespace Modules\Core\Traits;
 
 use Closure;
-use App\Contracts\TestContext;
-use App\Contracts\StepResult;
+use Modules\Core\Contracts\TestContext;
+use Modules\Core\Contracts\StepResult;
+
 
 trait HasStep
 {

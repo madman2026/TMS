@@ -2,7 +2,7 @@
 
 namespace Modules\Core\Traits;
 
-use App\Contracts\TestContext;
+use Modules\Core\Contracts\TestContext;
 use Playwright\Page\PageInterface;
 use RuntimeException;
 

@@ -2,7 +2,7 @@
 
 namespace App;
 
-use App\Contracts\Device;
+use Modules\Core\Contracts\Device;
 
 enum DeviceTypeEnum: string
 {

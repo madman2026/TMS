@@ -14,6 +14,8 @@ class AuthController extends Controller
     ){}
     public function all(Request $request)
     {
+        dd($request->attributes);
+
         $result = $this->service->all($request->attributes->get('profile'));
 
         return $result->status

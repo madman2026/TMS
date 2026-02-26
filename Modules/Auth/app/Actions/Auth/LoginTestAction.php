@@ -3,9 +3,9 @@
 namespace Modules\Auth\Actions\Auth;
 
 use App\Contracts\BaseAction;
-use App\Contracts\StepResult;
-use App\Contracts\TestContext;
+use Modules\Core\Contracts\TestContext;
 use Illuminate\Support\Facades\Hash;
+use Modules\Core\Contracts\StepResult;
 use Modules\Core\Traits\Assertion;
 use Modules\Core\Traits\HasStep;
 class LoginTestAction extends BaseAction

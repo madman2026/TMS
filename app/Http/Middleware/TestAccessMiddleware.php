@@ -1,13 +1,13 @@
 <?php
 namespace App\Http\Middleware;
 
-use App\Contracts\RequestOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\Profile;
 use Closure;
 use Illuminate\Support\Facades\Hash;
+use Modules\Core\Contracts\RequestOptions;
 
 class TestAccessMiddleware
 {
