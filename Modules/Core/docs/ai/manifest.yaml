@@ -1,0 +1,29 @@
+schema_version: 1
+owner:
+  id: core
+  name: Core
+  type: technical-module
+  layer: 3
+status: active
+migration_status: bootstrap-complete-accepted
+current_documentation_entry: Modules/Core/docs/ai/README.md
+project_profile: docs/project/ai/TMS-AI-PROFILE.md
+governance_profile: Modules/Core/docs/ai/GOVERNANCE-PROFILE.md
+router: Modules/Core/AGENTS.md
+indexes:
+  canonical: Modules/Core/docs/ai/canonical/CANONICAL-INDEX.md
+  guides: Modules/Core/docs/ai/guides/GUIDES-INDEX.md
+  decisions: Modules/Core/docs/ai/decisions/DECISIONS-INDEX.md
+  changes: Modules/Core/docs/ai/changes/CHANGES-INDEX.md
+  remediations: Modules/Core/docs/ai/remediations/REMEDIATIONS-INDEX.md
+  packs: Modules/Core/docs/ai/packs/PACKS-INDEX.md
+  runs: Modules/Core/docs/ai/runs/RUNS-INDEX.md
+  reviews: Modules/Core/docs/ai/reviews/REVIEWS-INDEX.md
+  references: Modules/Core/docs/ai/references/REFERENCES-INDEX.md
+scope:
+  includes:
+    - Modules/Core
+  excludes:
+    - root-application-behavior
+    - cross-module-governance
+    - repository-lifecycle-records

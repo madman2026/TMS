@@ -1,0 +1,5 @@
+# TMS PROJECT RUNS INDEX
+
+| Run | Status | Acceptance | File |
+|---|---|---|---|
+| Documentation governance bootstrap run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-DOCS-BOOTSTRAP-0001-run-001.md` |
