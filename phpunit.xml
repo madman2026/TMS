@@ -11,10 +11,17 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="Core Unit">
+            <directory>Modules/Core/tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Core Feature">
+            <directory>Modules/Core/tests/Feature</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
             <directory>app</directory>
+            <directory>Modules/Core/app</directory>
         </include>
     </source>
     <php>

@@ -4,6 +4,8 @@ namespace Modules\Core\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\BrowserFactory;
+use Modules\Core\Services\PlaywrightBrowserFactory;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -34,6 +36,7 @@ class CoreServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(BrowserFactory::class, PlaywrightBrowserFactory::class);
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
     }
@@ -129,7 +132,7 @@ class CoreServiceProvider extends ServiceProvider
 
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
 
-        Blade::componentNamespace(config('modules.namespace').'\\' . $this->name . '\\View\\Components', $this->nameLower);
+        Blade::componentNamespace(config('modules.namespace').'\\'.$this->name.'\\View\\Components', $this->nameLower);
     }
 
     /**

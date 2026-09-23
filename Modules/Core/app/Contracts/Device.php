@@ -2,9 +2,6 @@
 
 namespace Modules\Core\Contracts;
 
-use App\DeviceTypeEnum;
-use InvalidArgumentException;
-
 class Device
 {
     public static function androidMobile(): array
@@ -73,21 +70,6 @@ class Device
         ];
     }
 
-    // گرفتن داینامیک بر اساس نام
-    public static function get(DeviceTypeEnum $name): array
-    {
-        return match ($name) {
-            'android-mobile' => self::androidMobile(),
-            'android-tablet' => self::androidTablet(),
-            'ios-mobile' => self::iosMobile(),
-            'ios-tablet' => self::iosTablet(),
-            'laptop' => self::laptop(),
-            'desktop' => self::desktop(),
-            default => throw new InvalidArgumentException("Unknown device: {$name}")
-        };
-    }
-
-    // لیست نام‌ها برای حلقه تست
     public static function all(): array
     {
         return [

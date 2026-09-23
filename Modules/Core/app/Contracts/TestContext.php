@@ -2,39 +2,36 @@
 
 namespace Modules\Core\Contracts;
 
-use App\DeviceTypeEnum;
-use Playwright\Page\PageInterface;
-use App\Models\Profile;
-use App\Models\Test;
-use Illuminate\Http\Request;
 use Playwright\Browser\BrowserContextInterface;
-use Playwright\Browser\BrowserInterface;
-use Playwright\Playwright;
+use Playwright\Page\PageInterface;
 
 class TestContext
 {
-    public Profile $profile;
-    public BrowserContextInterface $browser;
-    public PageInterface $page;
-    public Test $test;
-    public DeviceTypeEnum $device;
-    public array $cookies = [];
+    public readonly PageInterface $page;
 
-    public function __construct(Profile $profile, Test $test)
-    {
-        $request = app(Request::class);
-        $this->profile = $profile;
-        $this->test = $test;
-        $config = $profile->data;
-        $customize_profile = $request->attributes->get('profile_customize');
-        $driver = $customize_profile?->browser?->value ?? $config?->browser?->driver ?? 'chrome';
-        $this->device = $customize_profile?->device ?? $profile->device ?? DeviceTypeEnum::DESKTOP;
-        $contextOptions = array_merge(
-            ['headless' => false],
-            $this->device->settings(),
-            $config?->browser?->settings ?? []
-        );
-        $this->browser = BrowserFactory::make($driver, $contextOptions);
+    private bool $closed = false;
+
+    public function __construct(
+        public readonly BrowserContextInterface $browser,
+        int $timeoutMs,
+    ) {
+        $this->browser->setDefaultTimeout($timeoutMs);
+        $this->browser->setDefaultNavigationTimeout($timeoutMs);
         $this->page = $this->browser->newPage();
+    }
+
+    public function close(): void
+    {
+        if ($this->closed) {
+            return;
+        }
+
+        $this->closed = true;
+        $this->browser->close();
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->closed;
     }
 }
