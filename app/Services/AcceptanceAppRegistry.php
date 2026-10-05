@@ -5,11 +5,12 @@ namespace App\Services;
 use App\Exceptions\AcceptanceRegistryException;
 use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Data\ScenarioMetadata;
 
 final class AcceptanceAppRegistry
 {
     /**
-     * @var array<string, array{app: AcceptanceApp, scenarios: array<string, AcceptanceScenario>}>
+     * @var array<string, array{app: AcceptanceApp, scenarios: array<string, array{scenario: AcceptanceScenario, metadata: ScenarioMetadata}>}>
      */
     private array $entries = [];
 
@@ -36,7 +37,10 @@ final class AcceptanceAppRegistry
                 throw AcceptanceRegistryException::duplicate();
             }
 
-            $scenarios[$scenarioKey] = $scenario;
+            $scenarios[$scenarioKey] = [
+                'scenario' => $scenario,
+                'metadata' => $scenario->metadata(),
+            ];
         }
 
         $this->entries[$appKey] = [
@@ -52,7 +56,12 @@ final class AcceptanceAppRegistry
 
     public function scenario(string $appKey, string $scenarioKey): ?AcceptanceScenario
     {
-        return $this->entries[$appKey]['scenarios'][$scenarioKey] ?? null;
+        return $this->entries[$appKey]['scenarios'][$scenarioKey]['scenario'] ?? null;
+    }
+
+    public function metadata(string $appKey, string $scenarioKey): ?ScenarioMetadata
+    {
+        return $this->entries[$appKey]['scenarios'][$scenarioKey]['metadata'] ?? null;
     }
 
     /**

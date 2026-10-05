@@ -10,11 +10,15 @@ use App\TestStatusEnum;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\RunOptions;
+use Modules\Core\Data\ScenarioMetadata;
+use Modules\Core\Enums\AutomationDisposition;
+use Modules\Core\Enums\EvidenceMode;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -254,13 +258,40 @@ class AcceptanceRunCommandTest extends TestCase
         );
     }
 
+    public function test_invalid_metadata_fails_registration_before_execution_or_persistence(): void
+    {
+        Log::spy();
+        $service = Mockery::mock(AcceptanceRunService::class);
+        $service->shouldNotReceive('run');
+        $this->app->instance(AcceptanceRunService::class, $service);
+
+        try {
+            $this->bindRegistry(['example-sensitive-value/invalid']);
+            $this->fail('Expected invalid metadata to fail registration.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Scenario metadata must contain unique, valid keys.', $exception->getMessage());
+            $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('tests', 0);
+        $this->assertDatabaseCount('steps', 0);
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('warning');
+    }
+
     /**
+     * @param  list<string>  $tags
      * @return array{AcceptanceApp, AcceptanceScenario}
      */
-    private function bindRegistry(): array
+    private function bindRegistry(array $tags = ['command-regression']): array
     {
-        $scenario = new class implements AcceptanceScenario
+        $scenario = new class($tags) implements AcceptanceScenario
         {
+            /**
+             * @param  list<string>  $tags
+             */
+            public function __construct(private readonly array $tags) {}
+
             public function key(): string
             {
                 return 'local-scenario';
@@ -269,6 +300,17 @@ class AcceptanceRunCommandTest extends TestCase
             public function name(): string
             {
                 return 'Local scenario';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return new ScenarioMetadata(
+                    suites: ['command'],
+                    capabilities: ['execution-delegation'],
+                    tags: $this->tags,
+                    disposition: AutomationDisposition::AUTOMATED,
+                    evidenceMode: EvidenceMode::METADATA_ONLY,
+                );
             }
 
             public function steps(TestContext $context): iterable

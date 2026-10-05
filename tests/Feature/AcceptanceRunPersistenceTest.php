@@ -18,6 +18,9 @@ use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
+use Modules\Core\Data\ScenarioMetadata;
+use Modules\Core\Enums\AutomationDisposition;
+use Modules\Core\Enums\EvidenceMode;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
 use Modules\Core\Services\AcceptanceRunner;
 use RuntimeException;
@@ -228,6 +231,17 @@ class AcceptanceRunPersistenceTest extends TestCase
             public function name(): string
             {
                 return 'Local scenario';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return new ScenarioMetadata(
+                    suites: ['persistence'],
+                    capabilities: ['run-results'],
+                    tags: ['in-memory'],
+                    disposition: AutomationDisposition::AUTOMATED,
+                    evidenceMode: EvidenceMode::METADATA_ONLY,
+                );
             }
 
             public function steps(TestContext $context): iterable

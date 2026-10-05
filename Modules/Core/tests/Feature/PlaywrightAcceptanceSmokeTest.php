@@ -8,6 +8,9 @@ use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\RunOptions;
+use Modules\Core\Data\ScenarioMetadata;
+use Modules\Core\Enums\AutomationDisposition;
+use Modules\Core\Enums\EvidenceMode;
 use Modules\Core\Services\AcceptanceRunner;
 use Modules\Core\Services\PlaywrightBrowserFactory;
 use Modules\Core\Traits\Assertion;
@@ -33,6 +36,17 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
             public function name(): string
             {
                 return 'Local browser smoke';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return new ScenarioMetadata(
+                    suites: ['browser-smoke'],
+                    capabilities: ['interaction', 'viewport'],
+                    tags: ['local-content'],
+                    disposition: AutomationDisposition::AUTOMATED,
+                    evidenceMode: EvidenceMode::NON_SENSITIVE_VISUAL,
+                );
             }
 
             public function steps(TestContext $context): iterable
@@ -105,6 +119,17 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
             public function name(): string
             {
                 return 'Local browser failure';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return new ScenarioMetadata(
+                    suites: ['browser-smoke'],
+                    capabilities: ['assertion-failure'],
+                    tags: ['local-content'],
+                    disposition: AutomationDisposition::AUTOMATED,
+                    evidenceMode: EvidenceMode::METADATA_ONLY,
+                );
             }
 
             public function steps(TestContext $context): iterable
