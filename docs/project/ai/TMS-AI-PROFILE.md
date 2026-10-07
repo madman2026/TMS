@@ -19,6 +19,13 @@ This profile binds reusable governance under `docs/ai/` to the TMS repository. I
 - Core documentation root: `Modules/Core/docs/ai/`
 - Module registry: `modules_statuses.json`
 
+## Project CLI operator documentation
+
+- Primary Acceptance CLI guide: `docs/project/ai/guides/ACCEPTANCE-CLI.fa.md`
+- Guide navigation: `docs/project/ai/guides/GUIDES-INDEX.md`
+- Operator guide language: Persian (`fa`); scope: project-owned Acceptance CLI usage, selection, limits, and safe troubleshooting.
+- This binding adds no target, credential, environment, database, browser, or command authorization.
+
 ## Technology context
 
 - PHP `^8.2` and Laravel `^12.0`

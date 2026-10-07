@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
 use App\Models\Profile;
 use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceRunService;
+use App\Services\AcceptanceVariantDispatcher;
 use App\TestStatusEnum;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +29,7 @@ final class RunAcceptanceCommand extends Command
     public function handle(
         AcceptanceAppRegistry $registry,
         AcceptanceRunService $runService,
+        AcceptanceVariantDispatcher $dispatcher,
     ): int {
         $executionStarted = false;
 
@@ -37,7 +40,9 @@ final class RunAcceptanceCommand extends Command
                 return $this->reject('acceptance_app_not_found');
             }
 
-            $scenario = $registry->scenario($app->key(), (string) $this->argument('scenario'));
+            $scenario = $registry->catalogProvider($app->key()) !== null
+                ? $dispatcher->resolve($app->key(), (string) $this->argument('scenario'))
+                : $registry->scenario($app->key(), (string) $this->argument('scenario'));
 
             if ($scenario === null) {
                 return $this->reject('acceptance_scenario_not_found');
@@ -75,6 +80,17 @@ final class RunAcceptanceCommand extends Command
             ]);
 
             return self::FAILURE;
+        } catch (AcceptanceCatalogException $exception) {
+            if ($exception->rejected()) {
+                Log::warning('tms.acceptance.command.failed', [
+                    'error_code' => $exception->errorCode,
+                    'exception_class' => $exception::class,
+                ]);
+
+                return $this->reject($exception->errorCode);
+            }
+
+            return $this->unexpectedFailure($exception->errorCode, $exception);
         } catch (AcceptanceRegistryException $exception) {
             return $this->unexpectedFailure($exception->errorCode, $exception);
         } catch (Throwable $exception) {

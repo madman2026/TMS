@@ -2,9 +2,9 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
 use App\Services\AcceptanceAppRegistry;
-use InvalidArgumentException;
 use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\TestContext;
@@ -50,7 +50,7 @@ class AcceptanceAppRegistryTest extends TestCase
         $this->assertSame($original, $registry->app('local-app'));
     }
 
-    public function test_it_rejects_duplicate_scenario_keys_without_registering_the_app(): void
+    public function test_duplicate_scenario_keys_fail_on_discovery_without_caching_partial_results(): void
     {
         $registry = new AcceptanceAppRegistry;
 
@@ -59,12 +59,15 @@ class AcceptanceAppRegistryTest extends TestCase
                 $this->scenario('local-scenario'),
                 $this->scenario('local-scenario'),
             ]));
+            $registry->scenarioKeys('local-app');
             $this->fail('Expected an AcceptanceRegistryException.');
         } catch (AcceptanceRegistryException $exception) {
             $this->assertSame('acceptance_registry_duplicate', $exception->errorCode);
         }
 
-        $this->assertNull($registry->app('local-app'));
+        $this->assertNotNull($registry->app('local-app'));
+        $this->expectException(AcceptanceRegistryException::class);
+        $registry->scenario('local-app', 'local-scenario');
     }
 
     public function test_it_rejects_invalid_keys_and_scenario_values_safely(): void
@@ -78,6 +81,7 @@ class AcceptanceAppRegistryTest extends TestCase
 
             try {
                 $registry->register($invalidApp);
+                $registry->scenarioKeys($invalidApp->key());
                 $this->fail('Expected an AcceptanceRegistryException.');
             } catch (AcceptanceRegistryException $exception) {
                 $this->assertSame('acceptance_registry_invalid', $exception->errorCode);
@@ -89,7 +93,7 @@ class AcceptanceAppRegistryTest extends TestCase
         }
     }
 
-    public function test_it_eagerly_retains_each_exact_metadata_object_without_recomputing_it(): void
+    public function test_it_defers_discovery_and_retains_each_exact_metadata_object_without_recomputing_it(): void
     {
         $first = $this->scenario('first-scenario');
         $second = $this->scenario('second-scenario');
@@ -102,9 +106,9 @@ class AcceptanceAppRegistryTest extends TestCase
         $registry->register($this->app('first-app', [$first, $second]));
         $registry->register($this->app('second-app', [$otherAppScenario]));
 
-        $this->assertSame(2, $first->metadataCalls);
-        $this->assertSame(2, $second->metadataCalls);
-        $this->assertSame(2, $otherAppScenario->metadataCalls);
+        $this->assertSame(1, $first->metadataCalls);
+        $this->assertSame(1, $second->metadataCalls);
+        $this->assertSame(1, $otherAppScenario->metadataCalls);
         $this->assertSame($firstMetadata, $registry->metadata('first-app', 'first-scenario'));
         $this->assertSame($secondMetadata, $registry->metadata('first-app', 'second-scenario'));
         $this->assertSame($otherMetadata, $registry->metadata('second-app', 'first-scenario'));
@@ -143,7 +147,7 @@ class AcceptanceAppRegistryTest extends TestCase
         $this->assertSame(0, $scenario->stepsCalls);
     }
 
-    public function test_invalid_metadata_rejects_the_whole_app_without_partial_registration(): void
+    public function test_invalid_metadata_rejects_discovery_without_partial_cache_or_affecting_another_app(): void
     {
         $invalid = new class implements AcceptanceScenario
         {
@@ -181,20 +185,84 @@ class AcceptanceAppRegistryTest extends TestCase
 
         try {
             $registry->register($this->app('invalid-app', [$this->scenario('valid-scenario'), $invalid]));
-            $this->fail('Expected invalid metadata to fail eager registration.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Scenario metadata must contain unique, valid keys.', $exception->getMessage());
+            $registry->scenarioKeys('invalid-app');
+            $this->fail('Expected invalid metadata to fail lazy discovery.');
+        } catch (AcceptanceRegistryException $exception) {
+            $this->assertSame('acceptance_registry_invalid', $exception->errorCode);
             $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
         }
 
-        $this->assertSame(['existing-app'], $registry->appKeys());
+        $this->assertSame(['existing-app', 'invalid-app'], $registry->appKeys());
         $this->assertSame($existingApp, $registry->app('existing-app'));
         $this->assertSame($existingMetadata, $registry->metadata('existing-app', 'existing-scenario'));
-        $this->assertNull($registry->app('invalid-app'));
-        $this->assertSame([], $registry->scenarioKeys('invalid-app'));
-        $this->assertNull($registry->scenario('invalid-app', 'valid-scenario'));
-        $this->assertNull($registry->metadata('invalid-app', 'valid-scenario'));
-        $this->assertNull($registry->metadata('invalid-app', 'invalid-scenario'));
+        $this->assertNotNull($registry->app('invalid-app'));
+        $this->expectException(AcceptanceRegistryException::class);
+        $registry->scenario('invalid-app', 'valid-scenario');
+    }
+
+    public function test_legacy_discovery_is_bounded_and_registration_does_not_advance_the_generator(): void
+    {
+        $observed = 0;
+        $factory = function () use (&$observed): iterable {
+            for ($i = 1; $i <= 10002; $i++) {
+                $observed++;
+                if ($observed > 10001) {
+                    throw new \LogicException('Advanced beyond the legacy budget.');
+                }
+                yield $this->scenario('scenario-'.$i);
+            }
+        };
+        $app = new class($factory) implements AcceptanceApp
+        {
+            public function __construct(private \Closure $factory) {}
+
+            public function key(): string
+            {
+                return 'large-app';
+            }
+
+            public function scenarios(): iterable
+            {
+                yield from ($this->factory)();
+            }
+        };
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($app);
+        $this->assertSame(0, $observed);
+        try {
+            $registry->scenarioKeys('large-app');
+            $this->fail('Expected the bounded legacy cache to reject overflow.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_limit_exceeded', $exception->errorCode);
+        }
+        $this->assertSame(10001, $observed);
+        $this->assertSame($app, $registry->app('large-app'));
+    }
+
+    public function test_registration_key_failure_is_normalized_without_an_exception_chain_or_partial_app(): void
+    {
+        $app = new class implements AcceptanceApp
+        {
+            public function key(): string
+            {
+                throw new \RuntimeException('example-sensitive-value');
+            }
+
+            public function scenarios(): iterable
+            {
+                throw new \LogicException('Registration must not discover scenarios.');
+            }
+        };
+        $registry = new AcceptanceAppRegistry;
+        try {
+            $registry->register($app);
+            $this->fail('Expected a normalized App definition failure.');
+        } catch (AcceptanceRegistryException $exception) {
+            $this->assertSame('acceptance_registry_invalid', $exception->errorCode);
+            $this->assertNull($exception->getPrevious());
+            $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
+        }
+        $this->assertSame([], $registry->appKeys());
     }
 
     /**

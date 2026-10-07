@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\AcceptanceCatalogProvider;
+use App\Data\ScenarioDescriptor;
+use App\Data\VariantDescriptor;
+use App\Exceptions\AcceptanceRegistryException;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\AcceptanceAppRegistry;
@@ -10,7 +14,6 @@ use App\TestStatusEnum;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
@@ -258,24 +261,28 @@ class AcceptanceRunCommandTest extends TestCase
         );
     }
 
-    public function test_invalid_metadata_fails_registration_before_execution_or_persistence(): void
+    public function test_invalid_metadata_fails_lazy_lookup_before_profile_execution_or_persistence(): void
     {
         Log::spy();
         $service = Mockery::mock(AcceptanceRunService::class);
         $service->shouldNotReceive('run');
         $this->app->instance(AcceptanceRunService::class, $service);
 
-        try {
-            $this->bindRegistry(['example-sensitive-value/invalid']);
-            $this->fail('Expected invalid metadata to fail registration.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Scenario metadata must contain unique, valid keys.', $exception->getMessage());
-            $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
-        }
+        $this->bindRegistry(['example-sensitive-value/invalid']);
+        $this->artisan('acceptance:run', [
+            'app' => 'local-app',
+            'scenario' => 'local-scenario',
+            'profile' => 'example-sensitive-value',
+        ])->expectsOutput(json_encode([
+            'status' => 'failed', 'error_code' => 'acceptance_registry_invalid',
+        ], JSON_THROW_ON_ERROR))->doesntExpectOutputToContain('example-sensitive-value')->assertExitCode(1);
 
         $this->assertDatabaseCount('tests', 0);
         $this->assertDatabaseCount('steps', 0);
-        Log::shouldNotHaveReceived('error');
+        Log::shouldHaveReceived('error')->once()->with('tms.acceptance.command.failed', [
+            'error_code' => 'acceptance_registry_invalid',
+            'exception_class' => AcceptanceRegistryException::class,
+        ]);
         Log::shouldNotHaveReceived('warning');
     }
 
@@ -347,6 +354,71 @@ class AcceptanceRunCommandTest extends TestCase
             'user_id' => $user->getKey(),
             'name' => 'local-profile-'.uniqid(),
         ]);
+    }
+
+    public function test_catalog_provider_default_variant_uses_existing_single_run_output_and_options(): void
+    {
+        [, $scenario] = $this->bindRegistry();
+        $app = new class($scenario) implements AcceptanceCatalogProvider
+        {
+            public array $resolutions = [];
+
+            public function __construct(private AcceptanceScenario $scenario) {}
+
+            public function key(): string
+            {
+                return 'local-app';
+            }
+
+            public function catalogVersion(): string
+            {
+                return 'v1';
+            }
+
+            public function descriptors(): iterable
+            {
+                yield new ScenarioDescriptor($this->scenario->key(), $this->scenario->metadata());
+            }
+
+            public function variants(string $scenarioKey): iterable
+            {
+                yield new VariantDescriptor('other');
+                yield new VariantDescriptor('default');
+            }
+
+            public function resolveScenario(string $scenarioKey, string $variantKey): ?AcceptanceScenario
+            {
+                $this->resolutions[] = [$scenarioKey, $variantKey];
+
+                return $this->scenario;
+            }
+
+            public function scenarios(): iterable
+            {
+                throw new RuntimeException('The optional provider must not use the legacy path.');
+            }
+        };
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($app);
+        $this->app->instance(AcceptanceAppRegistry::class, $registry);
+        $profile = $this->profile();
+        $test = $profile->tests()->create([
+            'name' => 'Local scenario', 'app_key' => 'local-app', 'scenario_key' => 'local-scenario',
+            'status' => TestStatusEnum::FINISHED,
+        ]);
+        $service = Mockery::mock(AcceptanceRunService::class);
+        $service->shouldReceive('run')->once()->withArgs(fn ($actualProfile, $actualApp, $actualScenario, $options): bool => $actualProfile->is($profile) && $actualApp === $app && $actualScenario === $scenario
+                && $options->browser === 'firefox' && $options->timeoutMs === 1234
+        )->andReturn($test);
+        $this->app->instance(AcceptanceRunService::class, $service);
+        $this->artisan('acceptance:run', [
+            'app' => 'local-app', 'scenario' => 'local-scenario', 'profile' => $profile->getKey(),
+            '--browser' => 'firefox', '--timeout' => '1234',
+        ])->expectsOutput(json_encode([
+            'status' => 'finished', 'test_id' => $test->getKey(), 'app_key' => 'local-app',
+            'scenario_key' => 'local-scenario', 'error_code' => null,
+        ], JSON_THROW_ON_ERROR))->assertSuccessful();
+        $this->assertSame([['local-scenario', 'default']], $app->resolutions);
     }
 
     private function rejectedJson(string $errorCode): string

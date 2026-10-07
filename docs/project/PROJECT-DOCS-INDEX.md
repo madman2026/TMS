@@ -11,6 +11,7 @@ This index routes repository-wide, cross-module, reference, and project lifecycl
 - Packs: `docs/project/ai/packs/PACKS-INDEX.md`
 - Runs: `docs/project/ai/runs/RUNS-INDEX.md`
 - Reviews: `docs/project/ai/reviews/REVIEWS-INDEX.md`
+- Operator guides: `docs/project/ai/guides/GUIDES-INDEX.md`
 
 ## References
 

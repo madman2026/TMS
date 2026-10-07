@@ -1,6 +1,6 @@
 # AI-PACK-TMS-BATCH-CLI-EXECUTION-0008 — Sequential Resumable Batch CLI Execution
 
-Status: `draft — needs normalization under Decision 0006 after Pack 0007 acceptance`
+Status: `draft — predecessor accepted; normalization and separate approval required`
 
 Generated: `2026-10-05`
 

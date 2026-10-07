@@ -6,3 +6,4 @@
 | Acceptance Runner stabilization run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-ACCEPTANCE-RUNNER-STABILIZATION-0002-run-001.md` |
 | Acceptance Command and App Registry run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-ACCEPTANCE-COMMAND-REGISTRY-0003-run-001.md` |
 | Generic Acceptance Scenario Contracts run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-GENERIC-ACCEPTANCE-CONTRACTS-0004-run-001.md` |
+| Lazy Scenario Catalog and Variant Dispatcher run 001 | accepted | accepted as bounded foundation | `docs/project/ai/runs/AI-PACK-TMS-SCENARIO-CATALOG-DISPATCHER-0007-run-001.md` |
