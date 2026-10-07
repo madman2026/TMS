@@ -1,5 +1,7 @@
 # AI-PACK-CORE-BROWSER-OBSERVABILITY-0001 — Run 001
 
+Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` supersedes this Run's future direction to project 0006; its unaccepted implementation was subsequently reverted and its proposal deleted with superseded Core 0002/project 0005. Historical execution/acceptance/test evidence below is unchanged. Current future work is normalization of Drafts 0007–0008, not execution of deleted proposals.
+
 ## 1. Run Metadata
 
 ```text

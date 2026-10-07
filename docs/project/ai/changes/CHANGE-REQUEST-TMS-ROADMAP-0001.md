@@ -1,5 +1,7 @@
 # CHANGE-REQUEST-TMS-ROADMAP-0001 — Reduce the synthetic testing/staging roadmap
 
+Current Roadmap Notice (2026-10-06): this implemented Change Request is retained as history. `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` and `docs/project/ai/changes/CHANGE-REQUEST-TMS-ROADMAP-0002.md` subsequently cancel/remove project 0006 and delete the already superseded Core 0002/project 0005 proposals. The original acceptance criteria and validation below describe the earlier revision, not current dependency or file-existence claims.
+
 ## 1. Title
 
 Remove standalone evidence/secret Packs from the active roadmap and carry minimum safeguards into remaining Draft Packs.
@@ -39,10 +41,10 @@ Documentation/planning only. No Config, Route, API, Permission, Database, Model,
 - `docs/project/ai/decisions/TMS-DECISION-0004-cli-only-staged-generic-acceptance-roadmap.md`
 - `docs/project/ai/changes/CHANGE-REQUEST-TMS-ROADMAP-0001.md`
 - `docs/project/ai/changes/CHANGES-INDEX.md`
-- `Modules/Core/docs/ai/packs/AI-PACK-CORE-EVIDENCE-SAFETY-0002.md`
+- `Modules/Core/docs/ai/packs/AI-PACK-CORE-EVIDENCE-SAFETY-0002.md` — historical Git path; proposal deleted by Decision 0006
 - `Modules/Core/docs/ai/packs/PACKS-INDEX.md`
-- `docs/project/ai/packs/AI-PACK-TMS-EPHEMERAL-EXECUTION-CONTEXT-0005.md`
-- `docs/project/ai/packs/AI-PACK-TMS-FIXTURE-LEASES-0006.md`
+- `docs/project/ai/packs/AI-PACK-TMS-EPHEMERAL-EXECUTION-CONTEXT-0005.md` — historical Git path; proposal deleted by Decision 0006
+- `docs/project/ai/packs/AI-PACK-TMS-FIXTURE-LEASES-0006.md` — historical Git path; proposal deleted by Decision 0006
 - `docs/project/ai/packs/AI-PACK-TMS-SCENARIO-CATALOG-DISPATCHER-0007.md`
 - `docs/project/ai/packs/AI-PACK-TMS-BATCH-CLI-EXECUTION-0008.md`
 - `docs/project/ai/packs/PACKS-INDEX.md`

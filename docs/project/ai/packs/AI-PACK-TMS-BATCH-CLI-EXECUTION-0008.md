@@ -1,14 +1,16 @@
 # AI-PACK-TMS-BATCH-CLI-EXECUTION-0008 — Sequential Resumable Batch CLI Execution
 
-Status: `draft — revised under Decision 0005; normalize after Pack 0007 acceptance`
+Status: `draft — needs normalization under Decision 0006 after Pack 0007 acceptance`
 
 Generated: `2026-10-05`
 
-Decision: `docs/project/ai/decisions/TMS-DECISION-0005-testing-only-minimal-safeguards-roadmap.md`; unchanged CLI/ownership constraints from Decision 0004 still apply.
+Decision: `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` controls deleted prerequisites and normalization. Decision 0005 retains synthetic testing/staging/safe-output constraints; unchanged CLI/ownership constraints from Decision 0004 still apply.
 
-Depends On: accepted project Packs 0004 and 0006–0007, and accepted Core Browser Observability Pack 0001
+Depends On: accepted project Packs 0004 and 0007, and accepted Core Browser Observability Pack 0001; cancelled/deleted Pack 0006 is not a prerequisite.
 
 Planning Revision: 2026-10-06; superseded Core Evidence Safety 0002 and project Ephemeral Execution Context 0005 are not prerequisites.
+
+Cancellation Revision (2026-10-06): Decision 0006 deletes those two proposals and cancels/removes fixture Pack 0006 after rollback. No fixture lifecycle, target-environment guard, lease types or fixture error codes from it exist in accepted source. Resolve any required environment/adapter/cleanup integration explicitly during normalization; do not silently recreate the cancelled Pack.
 
 Execution Gate: Draft; not executable before normalization, database/retention/status Decisions, and separate operator approval.
 
@@ -38,7 +40,7 @@ Reusable human-acceptance automation — scalable operational execution and repo
 
 ## 7. Source References
 
-Decisions 0002–0005; accepted active predecessor Pack/Run records; current Profile/Test/Step schema/models, Registry/catalog, command, RunService, enums, migrations, factories, and tests; applicable data/status/idempotency/error/test/reporting rules. Decision 0005 controls the revised safeguard scope and dependencies.
+Decisions 0002–0006; accepted active predecessor Pack/Run records; current Profile/Test/Step schema/models, Registry/catalog, command, RunService, enums, migrations, factories, and tests; applicable data/status/idempotency/error/test/reporting rules. Decision 0006 controls deleted dependencies and required normalization; Decision 0005 retains the unchanged safeguard scope.
 
 ## 8. Files to Create
 
@@ -60,7 +62,7 @@ Repository/project/Core routing/profiles; shared scope/execution/data/status/ide
 
 ## 11. Configuration / Settings Requirements
 
-Expected non-sensitive versioned defaults: per-invocation item limit/chunk size and stale-run threshold only if required. No API, UI, queue, scheduler, parallel worker, real secret, or target config. Any long-running process/CI timeout requirement must be documented in the normalized operator guide. Expanded operator-configurable browser/Profile/CLI options, resolution precedence, and effective-browser-settings snapshots remain deferred. Consume Pack 0006's minimum testing/staging target check and safe adapter boundary; do not introduce a generic secret provider/store/lease, comprehensive capture guard, or recording feature.
+Expected non-sensitive versioned defaults: per-invocation item limit/chunk size and stale-run threshold only if required. No API, UI, queue, scheduler, parallel worker, real secret, or target config. Any long-running process/CI timeout requirement must be documented in the normalized operator guide. Expanded operator-configurable browser/Profile/CLI options, resolution precedence, and effective-browser-settings snapshots remain deferred. Exact testing/staging target validation and adapter boundaries require normalization against actual source; no cancelled fixture/guard contract may be assumed. Do not introduce a generic secret provider/store/lease, comprehensive capture guard, or recording feature.
 
 ## 12. Do Not Change
 
@@ -76,7 +78,7 @@ Normalization must resolve and record before execution:
 4. history retention and Profile deletion behavior;
 5. command names/signatures, JSON contracts, exit codes, caps, and confirmation behavior;
 6. failure policy: continue, stop, or configurable threshold for scenario failures;
-7. cleanup recovery limits after process termination.
+7. exact target-environment validation, App-owned resource cleanup and process-termination recovery boundaries after cancellation of Pack 0006; no existing shared lease/lifecycle/error seam may be assumed.
 
 ## 14. Multilingual / Translation Requirements
 
@@ -97,7 +99,7 @@ Operator Documentation Impact: Yes. The normalized Pack must provide the generic
 - Persist batch identity, immutable selector/plan fingerprint, safe counts, cursor/progress, state, timestamps, and links to created Test runs.
 - Resume only when state and plan/catalog compatibility allow it; duplicate command execution must not repeat a completed logical item.
 - Check cancellation between items and before target-environment validation or fixture/target-App/browser setup.
-- Execute each new or resumed item through Pack 0006's accepted minimum target-environment/lifecycle boundary; production/unknown targets cannot bypass its pre-setup rejection. Target authentication stays App-owned without a generic secret lease/provider prerequisite.
+- Normalize the smallest required target-environment/adapter boundary against accepted source before new/resumed execution; production/unknown-target rejection must have an explicitly approved contract. The cancelled fixture lifecycle is not available. Target authentication stays App-owned without a generic secret lease/provider prerequisite.
 - Store only allowlisted operational metadata. Usable account passwords, cookies, tokens, authenticated storage, and raw adapter error values must not enter Test/Step/Batch records, plan/progress snapshots, CLI output, reports, or logs.
 - No automatic retry. A failed item is recorded once; explicit resume behavior must follow the normalized state contract.
 - Reports contain allowlisted metadata only.
@@ -108,7 +110,7 @@ CLI is the sole operator channel. Batch orchestration is project-owned; Core con
 
 ## 19. Validation Rules
 
-The normalized Pack must prove transitions, durable progress, crash/stale simulation, resume/idempotency, catalog-drift rejection, cancellation, failure policy, bounded lazy iteration, Test linkage, aggregate counts, retention relationships, safe JSON/logs, zero execution of ineligible variants, production/unknown-target rejection through Pack 0006 on start/resume, and fake authentication-sentinel absence from persistence/output/logs on success and failure.
+The normalized Pack must prove transitions, durable progress, crash/stale simulation, resume/idempotency, catalog-drift rejection, cancellation, failure policy, bounded lazy iteration, Test linkage, aggregate counts, retention relationships, safe JSON/logs, zero execution of ineligible variants, production/unknown-target rejection on start/resume through the contract approved at normalization, and fake authentication-sentinel absence from persistence/output/logs on success and failure.
 
 ## 20. Security Rules
 
@@ -116,7 +118,7 @@ Persist only safe keys, classifications, counts, fingerprints, statuses, timesta
 
 ## 21. Error Handling / Logging / Traceability Requirements
 
-High impact: command validation, status transitions, persistence failures, stale/interrupted runs, catalog drift, idempotency conflict, cancellation, active prerequisite or unsafe/unknown-target failure, scenario failure, cleanup failure, and report failure. Normalization must define each stable error code, exit code, retry/permanent/admin-action classification, state effect, log event/context, Batch/Test trace flow, and minimum omission test. Consume Pack 0006's accepted environment/error contract instead of inventing a competing one. Raw fake adapter errors containing authentication sentinels must not leak through history/log/report/CLI paths. No current code or API/UI contract is changed by this Draft.
+High impact: command validation, status transitions, persistence failures, stale/interrupted runs, catalog drift, idempotency conflict, cancellation, active prerequisite or unsafe/unknown-target failure, scenario failure, App-owned cleanup failure when applicable, and report failure. Normalization must define each stable error code, exit code, retry/permanent/admin-action classification, state effect, log event/context, Batch/Test trace flow, and minimum omission test. No accepted environment/fixture error contract from cancelled Pack 0006 exists; exact required mappings are deferred and must be approved before implementation. Raw fake adapter errors containing authentication sentinels must not leak through history/log/report/CLI paths. No current code or API/UI contract is changed by this Draft.
 
 ## 22. Data Model / Migration / Relationship Requirements
 
@@ -128,7 +130,7 @@ Document state-transition, idempotency, resume cursor/fingerprint, cancellation 
 
 ## 24. Testing Requirements
 
-Mandatory unit/state-machine, feature/CLI, database/relationship, idempotency, bounded-lazy, interruption/resume, cancellation, drift, failure precedence, logging/traceability, minimum credential omission, inherited testing/staging guard, and existing single-run regression tests. Shared implementation uses synthetic fake/local execution only; actual target testing/staging I/O remains outside this Pack. Do not require standalone secret/capture infrastructure suites.
+Mandatory unit/state-machine, feature/CLI, database/relationship, idempotency, bounded-lazy, interruption/resume, cancellation, drift, failure precedence, logging/traceability, minimum credential omission, explicitly normalized testing/staging validation, and existing single-run regression tests. Shared implementation uses synthetic fake/local execution only; actual target testing/staging I/O remains outside this Pack. Do not require standalone secret/capture infrastructure suites.
 
 ## 25. Acceptance Checklist
 
@@ -137,7 +139,7 @@ Mandatory unit/state-machine, feature/CLI, database/relationship, idempotency, b
 - [ ] progress survives interruption and resumes without duplication;
 - [ ] cancellation/drift/failure transitions are deterministic;
 - [ ] Batch-to-Test traceability and safe report counts are proven;
-- [ ] start/resume cannot bypass Pack 0006's production/unknown-target rejection;
+- [ ] exact environment/adapter/error boundaries are normalized against accepted source; start/resume cannot bypass the separately approved production/unknown-target rejection;
 - [ ] fake authentication sentinels are absent from persisted history, snapshots, CLI/report JSON, errors, and logs on success/failure/resume;
 - [ ] no expanded browser settings or generic secret/capture subsystem introduced;
 - [ ] operational history relationships and rollback are explicit;
@@ -175,7 +177,7 @@ Review database integrity/retention, state machine, idempotency, resume/cancel/d
 
 ## 32. Rollback / Safety Notes
 
-Rollback must stop active local execution, preserve/report operational history risk, follow approved down migrations, and never use destructive broad database or Git commands. Target fixture cleanup remains governed by Pack 0006.
+Rollback must stop active local execution, preserve/report operational history risk, follow approved down migrations, and never use destructive broad database or Git commands. Target-App cleanup and process-termination recovery limits must be explicitly resolved during normalization; cancelled Pack 0006 is not authority for them.
 
 ## 33. Stop Conditions
 

@@ -1,5 +1,7 @@
 # AI-PACK-CORE-BROWSER-OBSERVABILITY-0001 — Browser Interaction and Accessibility Observations
 
+Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` subsequently cancels/removes project 0006 and deletes the already superseded Core 0002/project 0005 proposals. References and next-Pack directions below are historical; Drafts 0007–0008 require normalization against accepted source. This notice changes no accepted Core behavior or validation result.
+
 Status: `accepted — operator accepted 2026-10-06; current headless smoke passed`
 
 Generated: `2026-10-05`

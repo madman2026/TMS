@@ -1,13 +1,15 @@
 # TMS-DECISION-0005 — Testing/staging-only execution and minimal inline safeguards
 
-Status: Accepted
+Status: Accepted — fixture prerequisite/proposal retention partly superseded by Decision 0006
 Scope: Project
 Source: Operator answer
 Date: 2026-10-06
 Review At: normalization of Pack 0006 and first target-App integration
 Blocking: No
 Closure Condition: superseded by a separately approved scope or safeguard decision
-Next Review At: `AI-PACK-TMS-FIXTURE-LEASES-0006` normalization
+Next Review At: project Pack 0007 normalization
+
+Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` cancels/removes project 0006 and deletes the superseded Core 0002/project 0005 proposal files. Its fixture dependency, retention instructions and earlier next-Pack directions are superseded. The original decision/reasoning below remains historical; testing/staging, synthetic-data, App ownership, safe-output and deferred-settings constraints remain applicable.
 
 ## Type
 
@@ -73,10 +75,10 @@ The future unsafe/unknown-environment error is operator-visible, rejects setup b
 - `docs/project/ai/decisions/TMS-DECISION-0004-cli-only-staged-generic-acceptance-roadmap.md` — supersession notice only
 - `docs/project/ai/changes/CHANGE-REQUEST-TMS-ROADMAP-0001.md`
 - `docs/project/ai/changes/CHANGES-INDEX.md`
-- `Modules/Core/docs/ai/packs/AI-PACK-CORE-EVIDENCE-SAFETY-0002.md` — superseded status/notice; historical body retained
+- `Modules/Core/docs/ai/packs/AI-PACK-CORE-EVIDENCE-SAFETY-0002.md` — historical Git path; proposal deleted by Decision 0006
 - `Modules/Core/docs/ai/packs/PACKS-INDEX.md`
-- `docs/project/ai/packs/AI-PACK-TMS-EPHEMERAL-EXECUTION-CONTEXT-0005.md` — superseded status/notice; historical body retained
-- `docs/project/ai/packs/AI-PACK-TMS-FIXTURE-LEASES-0006.md`
+- `docs/project/ai/packs/AI-PACK-TMS-EPHEMERAL-EXECUTION-CONTEXT-0005.md` — historical Git path; proposal deleted by Decision 0006
+- `docs/project/ai/packs/AI-PACK-TMS-FIXTURE-LEASES-0006.md` — historical Git path; proposal deleted by Decision 0006
 - `docs/project/ai/packs/AI-PACK-TMS-SCENARIO-CATALOG-DISPATCHER-0007.md`
 - `docs/project/ai/packs/AI-PACK-TMS-BATCH-CLI-EXECUTION-0008.md`
 - `docs/project/ai/packs/PACKS-INDEX.md`

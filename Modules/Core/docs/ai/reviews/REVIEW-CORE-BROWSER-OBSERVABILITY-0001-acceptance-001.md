@@ -1,5 +1,7 @@
 # Review — Core Browser Observability 0001 acceptance
 
+Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` supersedes the next-Pack 0006 follow-up recorded below. Project 0006 was later cancelled, fully reverted and deleted along with the already superseded Core 0002/project 0005 proposals. Core acceptance and the dated findings remain historical evidence without alteration; remaining Drafts 0007–0008 need normalization/separate approval.
+
 Date: 2026-10-06
 Type: documentation-maintenance / source-evidence review
 

@@ -1,6 +1,6 @@
 # TMS-DECISION-0004 — CLI-only staged generic Acceptance capability roadmap
 
-Status: Accepted — roadmap partly superseded by Decision 0005
+Status: Accepted — roadmap partly superseded by Decisions 0005–0006
 Scope: Project
 Source: Operator answer
 Date: 2026-10-05
@@ -8,6 +8,8 @@ Review At: normalization of the batch execution Pack or request for a second exe
 Blocking: No
 Closure Condition: superseded by a separately approved TMS execution-channel or capability-roadmap decision
 Next Review At: `AI-PACK-TMS-BATCH-CLI-EXECUTION-0008` normalization
+
+Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` cancels/removes project fixture Pack 0006 and deletes the already cancelled Core 0002/project 0005 proposals. Drafts 0007–0008 require normalization against accepted source without those dependencies. Earlier notices and the original chain below are historical; unchanged CLI/ownership/synthetic-data constraints remain applicable.
 
 Supersession Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0005-testing-only-minimal-safeguards-roadmap.md` replaces the standalone Core Evidence Safety 0002 / project Ephemeral Execution Context 0005 prerequisites with minimum safeguards inside Draft Packs 0006–0008 for synthetic testing/staging execution. Expanded operator-configurable test options are deferred. Follow Decision 0005 for the current chain; this original seven-Pack proposal is retained below as accepted history. CLI-only execution, code-owned Apps, staged approval, and the other scope exclusions remain applicable. Approved documentation change: `docs/project/ai/changes/CHANGE-REQUEST-TMS-ROADMAP-0001.md`.
 
