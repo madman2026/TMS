@@ -1,6 +1,6 @@
 # TMS-DECISION-0003 — CLI-first Acceptance execution
 
-Status: Accepted
+Status: Accepted — extended by Decision 0008
 Scope: Project
 Source: Operator answer
 Date: 2026-09-23
@@ -8,6 +8,8 @@ Review At: first Pack that introduces a real target-system App or a second execu
 Blocking: No
 Closure Condition: superseded by a separately approved TMS execution-channel decision
 Next Review At: first real Acceptance App Pack
+
+Current Architecture Notice (2026-10-07): `docs/project/ai/decisions/TMS-DECISION-0008-transport-neutral-operations-and-artisan-client.md` retains Artisan as the first complete client and requires every client to use transport-neutral application/operation services. The accepted initial CLI behavior below remains historical foundation; CLI is no longer the service boundary.
 
 ## Type
 

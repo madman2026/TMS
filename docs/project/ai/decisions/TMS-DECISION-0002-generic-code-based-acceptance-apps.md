@@ -1,6 +1,6 @@
 # TMS-DECISION-0002 — Generic code-based Acceptance Apps and Core boundary
 
-Status: Accepted
+Status: Accepted — target-App structure clarified by Decision 0007
 Scope: Project
 Source: Operator answer
 Date: 2026-09-23
@@ -8,6 +8,8 @@ Review At: first Pack that introduces a real target-system App
 Blocking: No
 Closure Condition: superseded by a separately approved TMS architecture decision
 Next Review At: first real Acceptance App Pack
+
+Current Architecture Notice (2026-10-07): `docs/project/ai/decisions/TMS-DECISION-0007-nwidart-target-modules-and-component-hierarchy.md` defines each target App as a Nwidart module and adds the first-class Component hierarchy. The generic Core/target boundary and tests-as-code requirements below remain active.
 
 ## Type
 

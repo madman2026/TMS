@@ -1,6 +1,6 @@
 # TMS-DECISION-0005 — Testing/staging-only execution and minimal inline safeguards
 
-Status: Accepted — fixture prerequisite/proposal retention partly superseded by Decision 0006
+Status: Accepted constraints — roadmap portions superseded by Decisions 0006 and 0013
 Scope: Project
 Source: Operator answer
 Date: 2026-10-06
@@ -8,6 +8,8 @@ Review At: normalization of Pack 0006 and first target-App integration
 Blocking: No
 Closure Condition: superseded by a separately approved scope or safeguard decision
 Next Review At: project Pack 0007 normalization
+
+Current Roadmap Notice (2026-10-07): Decision 0013 replaces the remaining roadmap sequence. Testing/staging-only targets, synthetic data, target-App ownership, sensitive-value omission, and safe-output constraints remain active. Newly approved Packs must not reinstate the deleted generic secret/fixture proposals; they implement the narrower boundaries in Decisions 0009–0011.
 
 Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` cancels/removes project 0006 and deletes the superseded Core 0002/project 0005 proposal files. Its fixture dependency, retention instructions and earlier next-Pack directions are superseded. The original decision/reasoning below remains historical; testing/staging, synthetic-data, App ownership, safe-output and deferred-settings constraints remain applicable.
 

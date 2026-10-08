@@ -1,6 +1,6 @@
 # TMS-DECISION-0004 — CLI-only staged generic Acceptance capability roadmap
 
-Status: Accepted — roadmap partly superseded by Decisions 0005–0006
+Status: Superseded — replaced by Decision 0013; retained as accepted history
 Scope: Project
 Source: Operator answer
 Date: 2026-10-05
@@ -8,6 +8,8 @@ Review At: normalization of the batch execution Pack or request for a second exe
 Blocking: No
 Closure Condition: superseded by a separately approved TMS execution-channel or capability-roadmap decision
 Next Review At: `AI-PACK-TMS-BATCH-CLI-EXECUTION-0008` normalization
+
+Current Roadmap Notice (2026-10-07): `TMS-DECISION-0013-fifteen-stage-layered-delivery-roadmap.md` replaces the CLI-only/sequential future roadmap and supersedes Draft Pack 0008. Accepted implementation evidence produced before this replacement remains valid. Decision 0005's testing/staging, synthetic-data, target ownership, and safe-output constraints remain active.
 
 Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` cancels/removes project fixture Pack 0006 and deletes the already cancelled Core 0002/project 0005 proposals. Drafts 0007–0008 require normalization against accepted source without those dependencies. Earlier notices and the original chain below are historical; unchanged CLI/ownership/synthetic-data constraints remain applicable.
 

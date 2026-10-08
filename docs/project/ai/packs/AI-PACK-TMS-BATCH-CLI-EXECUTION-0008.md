@@ -1,6 +1,6 @@
 # AI-PACK-TMS-BATCH-CLI-EXECUTION-0008 — Sequential Resumable Batch CLI Execution
 
-Status: `draft — predecessor accepted; normalization and separate approval required`
+Status: `superseded — do not normalize or execute`
 
 Generated: `2026-10-05`
 
@@ -12,7 +12,9 @@ Planning Revision: 2026-10-06; superseded Core Evidence Safety 0002 and project 
 
 Cancellation Revision (2026-10-06): Decision 0006 deletes those two proposals and cancels/removes fixture Pack 0006 after rollback. No fixture lifecycle, target-environment guard, lease types or fixture error codes from it exist in accepted source. Resolve any required environment/adapter/cleanup integration explicitly during normalization; do not silently recreate the cancelled Pack.
 
-Execution Gate: Draft; not executable before normalization, database/retention/status Decisions, and separate operator approval.
+Execution Gate: Closed. Decision 0013 replaces this Pack; retain this file as historical planning only.
+
+Supersession Notice (2026-10-07): Decision 0013 replaces this sequential CLI-only proposal with transport-neutral operations, explicit input/approval, extensible executors, Laravel queue/batch orchestration, complete Artisan client operations, and cross-client reporting. This file must not be normalized or executed.
 
 ## 1. Task ID
 
