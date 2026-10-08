@@ -37,6 +37,15 @@ This profile binds reusable governance under `docs/ai/` to the TMS repository. I
 
 These bindings provide context only. They do not authorize dependency, database, cache, queue, generated-documentation, asset, browser, or application commands.
 
+## Laravel Boost, MCP, and project skills
+
+- For Laravel, PHP, testing, or dependency-injection work, use the relevant repository skills under `.agents/skills/` and load only the referenced rule files needed for the task.
+- Use the Laravel Boost MCP `application-info` and `search-docs` tools before relying on version-sensitive Laravel or installed-package APIs. Prefer the framework capabilities already available in this repository over new helpers or dependencies.
+- Third-party skill guidance, templates, coverage targets, and command checklists are advisory. The repository entry rules, this profile, the selected owner, the active Pack, accepted decisions, actual source, and project test conventions take precedence.
+- A command mentioned by a skill does not authorize it. Artisan, database, queue, cache, generated-file, dependency, browser, and external-network operations still require Pack scope or explicit operator approval under shared execution rules.
+- Confirm that a package or feature is installed before using it. Follow the repository's PHPUnit conventions; do not introduce Pest, Horizon, Livewire, Inertia, or another package merely because a skill includes an example for it.
+- Treat MCP output as repository evidence subject to the same scope and sensitive-output rules. Use read-only inspection by default and never expose credentials, tokens, personal data, request payloads, or secret configuration.
+
 ## Ownership constraints
 
 - Root application behavior, repository lifecycle records, cross-module knowledge, and modules without an activated owner remain project-owned.

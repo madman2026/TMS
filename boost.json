@@ -1,0 +1,20 @@
+{
+    "agents": [
+        "codex"
+    ],
+    "cloud": false,
+    "guidelines": false,
+    "mcp": true,
+    "nightwatch": false,
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "tailwindcss-development",
+        "dependency-injection",
+        "laravel-specialist",
+        "mcp-development",
+        "php-best-practices"
+    ]
+}
