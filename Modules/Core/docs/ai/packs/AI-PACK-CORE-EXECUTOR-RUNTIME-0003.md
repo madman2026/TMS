@@ -1,10 +1,12 @@
 # AI-PACK-CORE-EXECUTOR-RUNTIME-0003 — Extensible executor and capability runtime
 
-Status: `draft — depends on project Packs 0009–0012; normalization and separate operator approval required`
+Status: `draft — stage 6 under Decision 0015; normalize after accepted project stage 5`
 
 Generated: `2026-10-07`
 
 Decision: project Decisions 0011 and 0013. Owner: Core.
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes the former stage order and compatibility-adapter assumptions. Normalize this Draft after the hierarchy cutover and project stages 3–5; no legacy runtime disposition or adapter may be introduced.
 
 ## 1. Task ID
 

@@ -7,8 +7,8 @@ use App\Models\Test;
 use App\TestStatusEnum;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
@@ -21,20 +21,23 @@ class AcceptanceRunService
 
     public function run(
         Profile $profile,
-        AcceptanceApp $app,
+        AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
         ?RunOptions $options = null,
     ): Test {
         $test = $profile->tests()->create([
             'name' => $scenario->name(),
-            'app_key' => $app->key(),
-            'scenario_key' => $scenario->key(),
+            'app_key' => $identity->appKey,
+            'component_key' => $identity->componentKey,
+            'suite_key' => $identity->suiteKey,
+            'scenario_key' => $identity->scenarioKey,
+            'variant_key' => $identity->variantKey,
             'status' => TestStatusEnum::PENDING,
             'data' => null,
         ]);
 
         try {
-            $result = $this->runner->run($app, $scenario, $options ?? $this->defaultOptions());
+            $result = $this->runner->run($identity, $scenario, $options ?? $this->defaultOptions());
         } catch (AcceptanceExecutionException $exception) {
             $this->recordExecutionFailure($test, $exception);
 
@@ -73,8 +76,7 @@ class AcceptanceRunService
                 if (! $step->passed) {
                     Log::warning('tms.acceptance.step.failed', [
                         'test_id' => $test->getKey(),
-                        'app_key' => $result->appKey,
-                        'scenario_key' => $result->scenarioKey,
+                        ...$this->identityContext($result->identity),
                         'step_name' => $step->name,
                         'error_code' => $step->errorCode,
                         'critical' => $step->critical,
@@ -114,8 +116,7 @@ class AcceptanceRunService
 
         Log::error('tms.acceptance.run.failed', [
             'test_id' => $test->getKey(),
-            'app_key' => $test->app_key,
-            'scenario_key' => $test->scenario_key,
+            ...$this->testIdentityContext($test),
             'error_code' => $exception->errorCode,
             'retryable' => $exception->retryable,
             'exception_class' => $exception->getPrevious() !== null
@@ -135,18 +136,41 @@ class AcceptanceRunService
                 'data' => null,
             ]);
         } catch (Throwable) {
-            // Logging below is the final trace when the database cannot record the failure.
+            // This log is the final trace when the database cannot record the failure.
         }
 
         Log::log($recorded ? 'error' : 'critical', 'tms.acceptance.run.failed', [
             'test_id' => $test->getKey(),
-            'app_key' => $test->app_key,
-            'scenario_key' => $test->scenario_key,
+            ...$this->testIdentityContext($test),
             'error_code' => $exception->errorCode,
             'retryable' => $exception->retryable,
             'exception_class' => $exception->getPrevious() !== null
                 ? $exception->getPrevious()::class
                 : $exception::class,
         ]);
+    }
+
+    /** @return array{app_key: string, component_key: string, suite_key: string, scenario_key: string, variant_key: string} */
+    private function identityContext(AcceptanceExecutionIdentity $identity): array
+    {
+        return [
+            'app_key' => $identity->appKey,
+            'component_key' => $identity->componentKey,
+            'suite_key' => $identity->suiteKey,
+            'scenario_key' => $identity->scenarioKey,
+            'variant_key' => $identity->variantKey,
+        ];
+    }
+
+    /** @return array{app_key: string, component_key: string, suite_key: string, scenario_key: string, variant_key: string} */
+    private function testIdentityContext(Test $test): array
+    {
+        return [
+            'app_key' => $test->app_key,
+            'component_key' => $test->component_key,
+            'suite_key' => $test->suite_key,
+            'scenario_key' => $test->scenario_key,
+            'variant_key' => $test->variant_key,
+        ];
     }
 }

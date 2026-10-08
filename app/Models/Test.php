@@ -18,7 +18,10 @@ class Test extends Model
         'status',
         'data',
         'app_key',
+        'component_key',
+        'suite_key',
         'scenario_key',
+        'variant_key',
         'error_code',
     ];
 

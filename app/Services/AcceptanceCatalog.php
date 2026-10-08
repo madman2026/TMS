@@ -2,21 +2,24 @@
 
 namespace App\Services;
 
+use App\Contracts\AcceptanceComponentProvider;
+use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
+use App\Data\SuiteDescriptor;
 use App\Data\VariantDescriptor;
 use App\Exceptions\AcceptanceCatalogException;
-use App\Exceptions\AcceptanceRegistryException;
 use InvalidArgumentException;
 use Throwable;
 use TypeError;
 
-/** Validates only visited metadata and never invokes runnable resolution. */
+/** Validates the complete hierarchy without materializing executable scenarios. */
 final class AcceptanceCatalog
 {
     public const MAX_VISITS = 10000;
 
     public function __construct(private readonly AcceptanceAppRegistry $registry) {}
 
+    /** @return list<string> */
     public function appKeys(): array
     {
         $keys = $this->registry->appKeys();
@@ -27,11 +30,10 @@ final class AcceptanceCatalog
 
     public function version(string $appKey): string
     {
-        if ($this->registry->app($appKey) === null) {
-            throw AcceptanceCatalogException::because('acceptance_app_not_found');
-        }
+        $provider = $this->provider($appKey);
+
         try {
-            return ScenarioDescriptor::assertKey($this->registry->catalogProvider($appKey)?->catalogVersion() ?? 'legacy-v1');
+            return ScenarioDescriptor::assertKey($provider->catalogVersion());
         } catch (AcceptanceCatalogException $exception) {
             throw $exception;
         } catch (TypeError) {
@@ -41,32 +43,93 @@ final class AcceptanceCatalog
         }
     }
 
+    /** @return iterable<ComponentDescriptor> */
+    public function components(string $appKey): iterable
+    {
+        try {
+            $seen = [];
+            $visits = 0;
+            foreach ($this->provider($appKey)->components() as $component) {
+                self::visit($visits);
+                if (! $component instanceof ComponentDescriptor) {
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
+                }
+                if (isset($seen[$component->key])) {
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_duplicate');
+                }
+                $seen[$component->key] = true;
+                yield $component;
+            }
+        } catch (AcceptanceCatalogException $exception) {
+            throw $exception;
+        } catch (InvalidArgumentException|TypeError) {
+            throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
+        } catch (Throwable) {
+            throw AcceptanceCatalogException::because('acceptance_catalog_failed');
+        }
+    }
+
+    /** @return iterable<SuiteDescriptor> */
+    public function suites(string $appKey): iterable
+    {
+        try {
+            $components = [];
+            foreach ($this->components($appKey) as $component) {
+                $components[$component->key] = true;
+            }
+            $seen = [];
+            $visits = 0;
+            foreach ($this->provider($appKey)->suites() as $suite) {
+                self::visit($visits);
+                if (! $suite instanceof SuiteDescriptor || ! isset($components[$suite->componentKey])) {
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
+                }
+                if (isset($seen[$suite->key])) {
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_duplicate');
+                }
+                $seen[$suite->key] = true;
+                yield $suite;
+            }
+        } catch (AcceptanceCatalogException $exception) {
+            throw $exception;
+        } catch (InvalidArgumentException|TypeError) {
+            throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
+        } catch (Throwable) {
+            throw AcceptanceCatalogException::because('acceptance_catalog_failed');
+        }
+    }
+
     /** @return iterable<ScenarioDescriptor> */
     public function descriptors(string $appKey): iterable
     {
         try {
-            $provider = $this->registry->catalogProvider($appKey);
-            $descriptors = $provider !== null ? $provider->descriptors() : $this->legacyDescriptors($appKey);
+            $components = [];
+            foreach ($this->components($appKey) as $component) {
+                $components[$component->key] = true;
+            }
+            $suites = [];
+            foreach ($this->suites($appKey) as $suite) {
+                $suites[$suite->key] = $suite->componentKey;
+            }
             $seen = [];
             $visits = 0;
-            foreach ($descriptors as $descriptor) {
+            foreach ($this->provider($appKey)->scenarios() as $descriptor) {
                 self::visit($visits);
-                if (! $descriptor instanceof ScenarioDescriptor) {
-                    throw AcceptanceCatalogException::because('acceptance_catalog_invalid');
+                if (! $descriptor instanceof ScenarioDescriptor
+                    || ! isset($components[$descriptor->componentKey])
+                    || ($suites[$descriptor->suiteKey] ?? null) !== $descriptor->componentKey) {
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
                 }
                 if (isset($seen[$descriptor->key])) {
-                    throw AcceptanceCatalogException::because('acceptance_catalog_duplicate');
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_duplicate');
                 }
                 $seen[$descriptor->key] = true;
                 yield $descriptor;
             }
         } catch (AcceptanceCatalogException $exception) {
             throw $exception;
-        } catch (AcceptanceRegistryException $exception) {
-            throw AcceptanceCatalogException::because($exception->errorCode === 'acceptance_registry_duplicate'
-                ? 'acceptance_catalog_duplicate' : 'acceptance_catalog_invalid');
         } catch (InvalidArgumentException|TypeError) {
-            throw AcceptanceCatalogException::because('acceptance_catalog_invalid');
+            throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
         } catch (Throwable) {
             throw AcceptanceCatalogException::because('acceptance_catalog_failed');
         }
@@ -76,17 +139,15 @@ final class AcceptanceCatalog
     public function variants(string $appKey, string $scenarioKey): iterable
     {
         try {
-            $provider = $this->registry->catalogProvider($appKey);
-            $variants = $provider !== null ? $provider->variants($scenarioKey) : [new VariantDescriptor('default')];
             $seen = [];
             $visits = 0;
-            foreach ($variants as $variant) {
+            foreach ($this->provider($appKey)->variants($scenarioKey) as $variant) {
                 self::visit($visits);
                 if (! $variant instanceof VariantDescriptor) {
-                    throw AcceptanceCatalogException::because('acceptance_catalog_invalid');
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
                 }
                 if (isset($seen[$variant->key])) {
-                    throw AcceptanceCatalogException::because('acceptance_catalog_duplicate');
+                    throw AcceptanceCatalogException::because('acceptance_hierarchy_duplicate');
                 }
                 $seen[$variant->key] = true;
                 yield $variant;
@@ -94,7 +155,7 @@ final class AcceptanceCatalog
         } catch (AcceptanceCatalogException $exception) {
             throw $exception;
         } catch (InvalidArgumentException|TypeError) {
-            throw AcceptanceCatalogException::because('acceptance_catalog_invalid');
+            throw AcceptanceCatalogException::because('acceptance_hierarchy_invalid');
         } catch (Throwable) {
             throw AcceptanceCatalogException::because('acceptance_catalog_failed');
         }
@@ -119,10 +180,9 @@ final class AcceptanceCatalog
         }
     }
 
-    private function legacyDescriptors(string $appKey): iterable
+    private function provider(string $appKey): AcceptanceComponentProvider
     {
-        foreach ($this->registry->scenarioKeys($appKey) as $key) {
-            yield new ScenarioDescriptor($key, $this->registry->metadata($appKey, $key));
-        }
+        return $this->registry->app($appKey)
+            ?? throw AcceptanceCatalogException::because('acceptance_app_not_found');
     }
 }

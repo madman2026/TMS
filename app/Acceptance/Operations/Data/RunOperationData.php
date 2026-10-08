@@ -12,13 +12,19 @@ final readonly class RunOperationData
         public TestStatusEnum $testStatus,
         public int $testId,
         public string $appKey,
+        public string $componentKey,
+        public string $suiteKey,
         public string $scenarioKey,
+        public string $variantKey,
         public ?string $errorCode,
     ) {
-        if ($testId < 1 || ! preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $appKey)
-            || ! preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $scenarioKey)
-            || ($errorCode !== null && ! in_array($errorCode, OperationResult::ERROR_CODES, true))) {
+        if ($testId < 1 || ($errorCode !== null && ! in_array($errorCode, OperationResult::ERROR_CODES, true))) {
             throw new InvalidArgumentException('operation_result_invalid');
+        }
+        foreach ([$appKey, $componentKey, $suiteKey, $scenarioKey, $variantKey] as $key) {
+            if (strlen($key) > 64 || ! preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $key)) {
+                throw new InvalidArgumentException('operation_result_invalid');
+            }
         }
     }
 }

@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Data\AcceptanceSelector;
 
-/** Client projection of the shared plan operation, preserving executable metadata rows. */
+/** Version-2 client projection of executable hierarchy rows. */
 final class PlanAcceptanceCommand extends ListAcceptanceCommand
 {
     protected $signature = 'acceptance:plan '.AcceptanceSelector::OPTIONS;

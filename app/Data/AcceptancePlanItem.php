@@ -10,11 +10,15 @@ final readonly class AcceptancePlanItem
 {
     public function __construct(
         public string $appKey,
+        public string $componentKey,
+        public string $suiteKey,
         public string $scenarioKey,
         public string $variantKey,
         public ScenarioMetadata $metadata,
     ) {
         ScenarioDescriptor::assertKey($appKey);
+        ScenarioDescriptor::assertKey($componentKey);
+        ScenarioDescriptor::assertKey($suiteKey);
         ScenarioDescriptor::assertKey($scenarioKey);
         ScenarioDescriptor::assertKey($variantKey);
         ScenarioDescriptor::classification($metadata);
@@ -29,6 +33,8 @@ final readonly class AcceptancePlanItem
     {
         return [
             'app_key' => $this->appKey,
+            'component_key' => $this->componentKey,
+            'suite_key' => $this->suiteKey,
             'scenario_key' => $this->scenarioKey,
             'variant_key' => $this->variantKey,
             ...ScenarioDescriptor::classification($this->metadata),
@@ -39,6 +45,12 @@ final readonly class AcceptancePlanItem
     public function identity(): string
     {
         // NUL cannot occur in validated keys, keeping tuple comparison unambiguous.
-        return implode("\0", [$this->appKey, $this->scenarioKey, $this->variantKey]);
+        return implode("\0", [
+            $this->appKey,
+            $this->componentKey,
+            $this->suiteKey,
+            $this->scenarioKey,
+            $this->variantKey,
+        ]);
     }
 }

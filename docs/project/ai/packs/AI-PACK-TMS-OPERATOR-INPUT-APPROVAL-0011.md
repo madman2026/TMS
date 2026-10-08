@@ -1,10 +1,12 @@
 # AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011 — Operator input and approval workflow
 
-Status: `draft — depends on Packs 0009–0010; normalization and separate operator approval required`
+Status: `draft — stage 4 under Decision 0015; normalize after accepted Pack 0010`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0008–0009, 0013, and 0014; Decision 0014 applied on 2026-10-08 (documentation only).
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering and all compatibility assumptions. Normalize this Draft against the single version-2 hierarchy contract before approval.
 
 ## 1. Task ID
 

@@ -2,11 +2,11 @@
 
 namespace Modules\Core\Services;
 
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\BrowserFactory;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
@@ -18,7 +18,7 @@ class AcceptanceRunner
     public function __construct(private readonly BrowserFactory $browserFactory) {}
 
     public function run(
-        AcceptanceApp $app,
+        AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
         RunOptions $options,
     ): RunResult {
@@ -29,8 +29,10 @@ class AcceptanceRunner
         $failure = null;
 
         try {
-            $appKey = $this->validateKey($app->key());
             $scenarioKey = $this->validateKey($scenario->key());
+            if ($scenarioKey !== $identity->scenarioKey) {
+                throw AcceptanceExecutionException::configurationInvalid();
+            }
             $scenarioName = $scenario->name();
             $browserContext = $this->createBrowserContext($options);
             $context = new TestContext($browserContext, $options->timeoutMs);
@@ -58,8 +60,7 @@ class AcceptanceRunner
             }
 
             $result = new RunResult(
-                appKey: $appKey,
-                scenarioKey: $scenarioKey,
+                identity: $identity,
                 scenarioName: $scenarioName,
                 passed: $passed,
                 duration: microtime(true) - $startedAt,

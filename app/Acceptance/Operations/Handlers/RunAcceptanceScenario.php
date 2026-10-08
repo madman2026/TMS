@@ -7,18 +7,17 @@ use App\Acceptance\Operations\Data\OperationRequest;
 use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
 use App\Models\Profile;
-use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceRunService;
 use App\Services\AcceptanceVariantDispatcher;
 use App\TestStatusEnum;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
 
-/** Preserve App -> default Scenario -> Profile -> options -> existing RunService ordering. */
+/** Resolve and execute one explicit hierarchy identity. */
 final class RunAcceptanceScenario implements AcceptanceOperationHandler
 {
     public function __construct(
-        private readonly AcceptanceAppRegistry $registry,
         private readonly AcceptanceVariantDispatcher $dispatcher,
         private readonly AcceptanceRunService $runService,
     ) {}
@@ -33,28 +32,35 @@ final class RunAcceptanceScenario implements AcceptanceOperationHandler
         $started = false;
         $parameters = $request->parameters;
         try {
-            $app = $this->registry->app($parameters['app_key']);
-            if ($app === null) {
-                return $this->rejection('acceptance_app_not_found', $correlationId, $operationId);
-            }
-            $scenario = $this->registry->catalogProvider($app->key()) !== null
-                ? $this->dispatcher->resolve($app->key(), $parameters['scenario_key'])
-                : $this->registry->scenario($app->key(), $parameters['scenario_key']);
-            if ($scenario === null) {
-                return $this->rejection('acceptance_scenario_not_found', $correlationId, $operationId);
-            }
+            $identity = new AcceptanceExecutionIdentity(
+                $parameters['app_key'],
+                $parameters['component_key'],
+                $parameters['suite_key'],
+                $parameters['scenario_key'],
+                $parameters['variant_key'],
+            );
+            $scenario = $this->dispatcher->resolve($identity);
             $profile = Profile::query()->find($parameters['profile_id']);
             if ($profile === null) {
                 return $this->rejection('acceptance_profile_not_found', $correlationId, $operationId);
             }
             $options = $this->options($parameters);
             $started = true;
-            $test = $this->runService->run($profile, $app, $scenario, $options);
+            $test = $this->runService->run($profile, $identity, $scenario, $options);
             $code = $test->error_code;
             if ($code !== null && ! in_array($code, OperationResult::ERROR_CODES, true)) {
                 $code = 'acceptance_command_failed';
             }
-            $data = new RunOperationData($test->status, (int) $test->getKey(), $app->key(), $scenario->key(), $code);
+            $data = new RunOperationData(
+                $test->status,
+                (int) $test->getKey(),
+                $identity->appKey,
+                $identity->componentKey,
+                $identity->suiteKey,
+                $identity->scenarioKey,
+                $identity->variantKey,
+                $code,
+            );
 
             return new OperationResult($this->name(), $test->status === TestStatusEnum::FINISHED ? 'succeeded' : 'failed',
                 $code, $correlationId, $operationId, data: $data);

@@ -9,6 +9,8 @@ Blocking: Yes for scenario import and disposition
 Closure Condition: superseded by a separately approved test-policy decision
 Next Review At: first DK corpus-mapping Pack
 
+Current Architecture Notice (2026-10-08): Decision 0015 makes removal of the `manual-only` runtime disposition part of the immediate hierarchy-cutover remediation. Source coverage exclusions remain represented only by the five mapping dispositions defined below.
+
 ## Type
 
 4. Project-level test policy decision

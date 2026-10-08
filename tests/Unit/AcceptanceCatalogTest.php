@@ -2,8 +2,10 @@
 
 namespace Tests\Unit;
 
-use App\Contracts\AcceptanceCatalogProvider;
+use App\Contracts\AcceptanceComponentProvider;
+use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
+use App\Data\SuiteDescriptor;
 use App\Data\VariantDescriptor;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Services\AcceptanceAppRegistry;
@@ -14,253 +16,263 @@ use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use stdClass;
+use TypeError;
 
 class AcceptanceCatalogTest extends TestCase
 {
-    public function test_registration_and_metadata_discovery_never_materialize_a_catalog_provider(): void
+    public function test_it_exposes_a_valid_complete_hierarchy_without_resolving_runtime_code(): void
     {
-        $app = $this->provider([
-            new ScenarioDescriptor('scenario-b', $this->metadata()),
-            new ScenarioDescriptor('scenario-a', $this->metadata()),
+        $provider = $this->provider();
+        $catalog = $this->catalog($provider);
+
+        $this->assertSame(['component-a'], array_column(iterator_to_array($catalog->components('app-a')), 'key'));
+        $this->assertSame(['suite-a'], array_column(iterator_to_array($catalog->suites('app-a')), 'key'));
+        $this->assertSame(['scenario-a'], array_column(iterator_to_array($catalog->descriptors('app-a')), 'key'));
+        $this->assertSame(['variant-a'], array_column(iterator_to_array($catalog->variants('app-a', 'scenario-a')), 'key'));
+        $this->assertSame(0, $provider->resolveCalls);
+    }
+
+    public function test_it_rejects_missing_or_mismatched_hierarchy_references(): void
+    {
+        $provider = $this->provider(
+            suites: [new SuiteDescriptor('suite-a', 'missing-component')],
+        );
+
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($provider)->suites('app-a'),
+        ));
+
+        $provider = $this->provider(
+            scenarios: [new ScenarioDescriptor('scenario-a', 'component-a', 'missing-suite', $this->metadata())],
+        );
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($provider)->descriptors('app-a'),
+        ));
+    }
+
+    public function test_it_rejects_duplicate_identity_in_every_hierarchy_collection(): void
+    {
+        $provider = $this->provider(components: [new ComponentDescriptor('component-a'), new ComponentDescriptor('component-a')]);
+        $this->assertCatalogError('acceptance_hierarchy_duplicate', fn () => iterator_to_array(
+            $this->catalog($provider)->components('app-a'),
+        ));
+
+        $provider = $this->provider(suites: [
+            new SuiteDescriptor('suite-a', 'component-a'),
+            new SuiteDescriptor('suite-a', 'component-a'),
         ]);
-        $registry = new AcceptanceAppRegistry;
-        $registry->register($app);
-        $this->assertSame(0, $app->descriptorCalls);
-        $this->assertSame(0, $app->variantCalls);
-        $this->assertSame(0, $app->resolveCalls);
-
-        $catalog = new AcceptanceCatalog($registry);
-        $this->assertSame(['scenario-b', 'scenario-a'], array_map(
-            fn (ScenarioDescriptor $descriptor): string => $descriptor->key,
-            iterator_to_array($catalog->descriptors('local-app')),
+        $this->assertCatalogError('acceptance_hierarchy_duplicate', fn () => iterator_to_array(
+            $this->catalog($provider)->suites('app-a'),
         ));
-        $this->assertSame('v1', $catalog->version('local-app'));
-        $this->assertSame(['default'], array_map(
-            fn (VariantDescriptor $variant): string => $variant->key,
-            iterator_to_array($catalog->variants('local-app', 'scenario-a')),
+
+        $scenario = new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $this->metadata());
+        $provider = $this->provider(scenarios: [$scenario, $scenario]);
+        $this->assertCatalogError('acceptance_hierarchy_duplicate', fn () => iterator_to_array(
+            $this->catalog($provider)->descriptors('app-a'),
         ));
-        $this->assertSame(['scenario-b', 'scenario-a'], $registry->scenarioKeys('local-app'));
-        $this->assertSame(['suite-a'], $registry->metadata('local-app', 'scenario-a')->suites);
-        $this->assertNull($registry->metadata('local-app', 'missing'));
-        $this->assertSame(0, $app->legacyCalls);
-        $this->assertSame(0, $app->resolveCalls);
-        $this->assertSame(0, $app->accountCalls);
+
+        $provider = $this->provider(variants: [new VariantDescriptor('variant-a'), new VariantDescriptor('variant-a')]);
+        $this->assertCatalogError('acceptance_hierarchy_duplicate', fn () => iterator_to_array(
+            $this->catalog($provider)->variants('app-a', 'scenario-a'),
+        ));
     }
 
-    public function test_invalid_descriptor_variant_and_metadata_inputs_are_safe(): void
+    public function test_provider_failures_are_normalized_without_sensitive_values(): void
     {
-        foreach ([
-            fn () => new ScenarioDescriptor('example-token-sentinel/invalid', $this->metadata()),
-            fn () => new ScenarioDescriptor(str_repeat('a', 65), $this->metadata()),
-            fn () => new ScenarioDescriptor("key\n", $this->metadata()),
-            fn () => new VariantDescriptor('example-session-sentinel invalid'),
-            fn () => new ScenarioDescriptor('valid', $this->metadata(tags: [str_repeat('a', 65)])),
-            fn () => new ScenarioDescriptor('valid', $this->metadata(tags: array_map(fn ($i) => 'tag-'.$i, range(1, 65)))),
-        ] as $create) {
-            $this->assertCatalogError('acceptance_catalog_invalid', $create);
-        }
+        foreach (['version', 'components', 'suites', 'scenarios', 'variants'] as $boundary) {
+            $provider = $this->provider();
+            $provider->failureAt = $boundary;
+            $catalog = $this->catalog($provider);
+            $action = match ($boundary) {
+                'version' => fn () => $catalog->version('app-a'),
+                'components' => fn () => iterator_to_array($catalog->components('app-a')),
+                'suites' => fn () => iterator_to_array($catalog->suites('app-a')),
+                'scenarios' => fn () => iterator_to_array($catalog->descriptors('app-a')),
+                'variants' => fn () => iterator_to_array($catalog->variants('app-a', 'scenario-a')),
+            };
 
-        foreach (['descriptor', 'variant'] as $kind) {
-            $app = $this->provider($kind === 'descriptor' ? [new stdClass] : [
-                new ScenarioDescriptor('scenario-a', $this->metadata()),
-            ], $kind === 'variant' ? [new stdClass] : [new VariantDescriptor('default')]);
-            $registry = new AcceptanceAppRegistry;
-            $registry->register($app);
-            $catalog = new AcceptanceCatalog($registry);
-            $this->assertCatalogError('acceptance_catalog_invalid', fn () => iterator_to_array(
-                $kind === 'descriptor' ? $catalog->descriptors('local-app') : $catalog->variants('local-app', 'scenario-a'),
-            ));
+            $this->assertCatalogError('acceptance_catalog_failed', $action);
         }
     }
 
-    public function test_duplicate_descriptor_and_variant_identity_is_scoped_and_rejected(): void
+    public function test_hierarchy_traversal_stops_at_the_fixed_budget(): void
     {
-        $descriptor = new ScenarioDescriptor('scenario-a', $this->metadata());
-        foreach ([[$descriptor, $descriptor], [$descriptor]] as $index => $descriptors) {
-            $app = $this->provider($descriptors, $index === 1
-                ? [new VariantDescriptor('default'), new VariantDescriptor('default')]
-                : [new VariantDescriptor('default')]);
-            $registry = new AcceptanceAppRegistry;
-            $registry->register($app);
-            $catalog = new AcceptanceCatalog($registry);
-            $this->assertCatalogError('acceptance_catalog_duplicate', fn () => iterator_to_array(
-                $index === 0 ? $catalog->descriptors('local-app') : $catalog->variants('local-app', 'scenario-a'),
-            ));
-        }
-    }
-
-    public function test_typed_provider_definition_failures_are_invalid_without_exposing_the_type_error(): void
-    {
-        foreach (['descriptor', 'variant', 'version'] as $kind) {
-            $app = $this->provider(
-                $kind === 'descriptor' ? fn (): iterable => null : [new ScenarioDescriptor('scenario-a', $this->metadata())],
-                $kind === 'variant' ? fn (): iterable => null : [new VariantDescriptor('default')],
-            );
-            $app->invalidVersion = $kind === 'version';
-            $registry = new AcceptanceAppRegistry;
-            $registry->register($app);
-            $catalog = new AcceptanceCatalog($registry);
-            $this->assertCatalogError('acceptance_catalog_invalid', fn () => match ($kind) {
-                'descriptor' => iterator_to_array($catalog->descriptors('local-app')),
-                'variant' => iterator_to_array($catalog->variants('local-app', 'scenario-a')),
-                'version' => $catalog->version('local-app'),
-            });
-        }
-    }
-
-    public function test_provider_failures_discard_raw_text_and_previous_exceptions(): void
-    {
-        foreach (['descriptor', 'variant', 'version'] as $kind) {
-            $app = $this->provider($kind === 'descriptor'
-                ? fn () => throw new RuntimeException('example-credential-sentinel')
-                : [new ScenarioDescriptor('scenario-a', $this->metadata())],
-                $kind === 'variant' ? fn () => throw new RuntimeException('example-session-sentinel') : [new VariantDescriptor('default')],
-            );
-            $app->failVersion = $kind === 'version';
-            $registry = new AcceptanceAppRegistry;
-            $registry->register($app);
-            $catalog = new AcceptanceCatalog($registry);
-            $this->assertCatalogError('acceptance_catalog_failed', fn () => match ($kind) {
-                'descriptor' => iterator_to_array($catalog->descriptors('local-app')),
-                'variant' => iterator_to_array($catalog->variants('local-app', 'scenario-a')),
-                'version' => $catalog->version('local-app'),
-            });
+        $components = [];
+        for ($index = 0; $index <= AcceptanceCatalog::MAX_VISITS; $index++) {
+            $components[] = new ComponentDescriptor('component-'.$index);
         }
 
-        $app = $this->provider([]);
-        $app->revision = 'example-token-sentinel/invalid';
-        $registry = new AcceptanceAppRegistry;
-        $registry->register($app);
-        $this->assertCatalogError('acceptance_catalog_invalid', fn () => (new AcceptanceCatalog($registry))->version('local-app'));
-    }
-
-    public function test_descriptor_variants_and_classification_are_immutable_and_canonical(): void
-    {
-        $key = 'tag-b';
-        $keys = [&$key, 'tag-a'];
-        $descriptor = new ScenarioDescriptor('scenario-a', $this->metadata(tags: $keys));
-        $key = 'example-token-sentinel/invalid';
-        $this->assertSame(['tag-a', 'tag-b'], ScenarioDescriptor::classification($descriptor->metadata)['tags']);
-        $this->assertSame(['tag-b', 'tag-a'], $descriptor->metadata->tags);
-
-        foreach ([$descriptor, new VariantDescriptor('default')] as $object) {
-            try {
-                $object->key = 'changed';
-                $this->fail('Readonly identity must reject mutation.');
-            } catch (Error) {
-                $this->assertNotSame('changed', $object->key);
-            }
-        }
-    }
-
-    public function test_descriptor_traversal_stops_at_the_first_over_budget_observation(): void
-    {
-        $observed = 0;
-        $app = $this->provider(function () use (&$observed): iterable {
-            for ($i = 1; $i <= 10002; $i++) {
-                $observed++;
-                if ($observed > 10001) {
-                    throw new RuntimeException('The catalog advanced beyond its budget.');
-                }
-                yield new ScenarioDescriptor('scenario-'.$i, $this->metadata());
-            }
-        });
-        $registry = new AcceptanceAppRegistry;
-        $registry->register($app);
         $this->assertCatalogError('acceptance_catalog_limit_exceeded', fn () => iterator_to_array(
-            (new AcceptanceCatalog($registry))->descriptors('local-app'),
+            $this->catalog($this->provider(components: $components))->components('app-a'),
         ));
-        $this->assertSame(10001, $observed);
-        $this->assertSame(0, $app->resolveCalls);
     }
 
-    private function assertCatalogError(string $code, callable $action): void
+    public function test_invalid_collection_values_and_version_type_errors_are_normalized(): void
     {
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($this->provider(components: [new stdClass]))->components('app-a'),
+        ));
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($this->provider(suites: [new stdClass]))->suites('app-a'),
+        ));
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($this->provider(scenarios: [new stdClass]))->descriptors('app-a'),
+        ));
+        $this->assertCatalogError('acceptance_hierarchy_invalid', fn () => iterator_to_array(
+            $this->catalog($this->provider(variants: [new stdClass]))->variants('app-a', 'scenario-a'),
+        ));
+
+        $provider = $this->provider();
+        $provider->failVersionType = true;
+        $this->assertCatalogError('acceptance_catalog_invalid', fn () => $this->catalog($provider)->version('app-a'));
+    }
+
+    public function test_descriptors_and_classification_are_readonly_and_canonical(): void
+    {
+        $metadata = new ScenarioMetadata(
+            ['z-capability', 'a-capability'],
+            ['z-tag', 'a-tag'],
+            AutomationDisposition::AUTOMATED,
+            EvidenceMode::NON_SENSITIVE_VISUAL,
+        );
+        $descriptor = new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $metadata);
+
+        $this->assertSame([
+            'capabilities' => ['a-capability', 'z-capability'],
+            'tags' => ['a-tag', 'z-tag'],
+            'disposition' => 'automated',
+            'evidence_mode' => 'non-sensitive-visual',
+        ], ScenarioDescriptor::classification($descriptor->metadata));
+
         try {
-            $action();
-            $this->fail('Expected a safe catalog exception.');
-        } catch (AcceptanceCatalogException $exception) {
-            $this->assertSame($code, $exception->errorCode);
-            $this->assertNull($exception->getPrevious());
-            foreach (['example-credential-sentinel', 'example-session-sentinel', 'example-token-sentinel'] as $sentinel) {
-                $this->assertStringNotContainsString($sentinel, $exception->getMessage());
-            }
+            $descriptor->key = 'changed';
+            $this->fail('Expected readonly descriptor.');
+        } catch (Error) {
+            $this->assertSame('scenario-a', $descriptor->key);
         }
     }
 
-    private function metadata(array $tags = ['tag-a']): ScenarioMetadata
+    private function catalog(AcceptanceComponentProvider $provider): AcceptanceCatalog
     {
-        return new ScenarioMetadata(['suite-a'], ['cap-a'], $tags, AutomationDisposition::AUTOMATED, EvidenceMode::METADATA_ONLY);
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($provider);
+
+        return new AcceptanceCatalog($registry);
     }
 
-    private function provider(array|callable $descriptors, array|callable $variants = []): AcceptanceCatalogProvider
-    {
-        if ($variants === []) {
-            $variants = [new VariantDescriptor('default')];
-        }
-
-        return new class($descriptors, $variants) implements AcceptanceCatalogProvider
+    /**
+     * @param  list<ComponentDescriptor>|null  $components
+     * @param  list<SuiteDescriptor>|null  $suites
+     * @param  list<ScenarioDescriptor>|null  $scenarios
+     * @param  list<VariantDescriptor>|null  $variants
+     */
+    private function provider(
+        ?array $components = null,
+        ?array $suites = null,
+        ?array $scenarios = null,
+        ?array $variants = null,
+    ): AcceptanceComponentProvider {
+        return new class($components ?? [new ComponentDescriptor('component-a')], $suites ?? [new SuiteDescriptor('suite-a', 'component-a')], $scenarios ?? [new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $this->metadata())], $variants ?? [new VariantDescriptor('variant-a')]) implements AcceptanceComponentProvider
         {
-            public int $descriptorCalls = 0;
-
-            public int $variantCalls = 0;
-
             public int $resolveCalls = 0;
 
-            public int $legacyCalls = 0;
+            public ?string $failureAt = null;
 
-            public int $accountCalls = 0;
+            public bool $failVersionType = false;
 
-            public bool $failVersion = false;
-
-            public bool $invalidVersion = false;
-
-            public string $revision = 'v1';
-
-            public function __construct(private mixed $descriptors, private mixed $variants) {}
+            public function __construct(
+                private readonly array $componentRows,
+                private readonly array $suiteRows,
+                private readonly array $scenarioRows,
+                private readonly array $variantRows,
+            ) {}
 
             public function key(): string
             {
-                return 'local-app';
+                return 'app-a';
             }
 
             public function catalogVersion(): string
             {
-                if ($this->invalidVersion) {
-                    return null;
+                if ($this->failureAt === 'version') {
+                    throw new \RuntimeException('example-sensitive-value');
                 }
-                if ($this->failVersion) {
-                    throw new RuntimeException('example-token-sentinel');
+                if ($this->failVersionType) {
+                    throw new TypeError('example-sensitive-value');
                 }
 
-                return $this->revision;
+                return 'v2';
             }
 
-            public function descriptors(): iterable
+            public function components(): iterable
             {
-                $this->descriptorCalls++;
-                yield from is_callable($this->descriptors) ? ($this->descriptors)() : $this->descriptors;
+                if ($this->failureAt === 'components') {
+                    throw new \RuntimeException('example-sensitive-value');
+                }
+
+                yield from $this->componentRows;
             }
 
-            public function variants(string $scenarioKey): iterable
+            public function suites(): iterable
             {
-                $this->variantCalls++;
-                yield from is_callable($this->variants) ? ($this->variants)() : $this->variants;
-            }
+                if ($this->failureAt === 'suites') {
+                    throw new \RuntimeException('example-sensitive-value');
+                }
 
-            public function resolveScenario(string $scenarioKey, string $variantKey): ?AcceptanceScenario
-            {
-                $this->resolveCalls++;
-                throw new RuntimeException('example-credential-sentinel');
+                yield from $this->suiteRows;
             }
 
             public function scenarios(): iterable
             {
-                $this->legacyCalls++;
-                throw new RuntimeException('Catalog inspection must not use legacy scenarios.');
+                if ($this->failureAt === 'scenarios') {
+                    throw new \RuntimeException('example-sensitive-value');
+                }
+
+                yield from $this->scenarioRows;
+            }
+
+            public function variants(string $scenarioKey): iterable
+            {
+                if ($this->failureAt === 'variants') {
+                    throw new \RuntimeException('example-sensitive-value');
+                }
+
+                yield from $this->variantRows;
+            }
+
+            public function resolveScenario(
+                string $componentKey,
+                string $suiteKey,
+                string $scenarioKey,
+                string $variantKey,
+            ): ?AcceptanceScenario {
+                $this->resolveCalls++;
+
+                return null;
             }
         };
+    }
+
+    private function metadata(): ScenarioMetadata
+    {
+        return new ScenarioMetadata(
+            ['capability-a'],
+            ['tag-a'],
+            AutomationDisposition::AUTOMATED,
+            EvidenceMode::METADATA_ONLY,
+        );
+    }
+
+    private function assertCatalogError(string $code, callable $callback): void
+    {
+        try {
+            $callback();
+            $this->fail('Expected catalog error.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame($code, $exception->errorCode);
+            $this->assertNull($exception->getPrevious());
+            $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
+        }
     }
 }

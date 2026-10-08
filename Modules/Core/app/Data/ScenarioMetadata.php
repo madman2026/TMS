@@ -13,27 +13,21 @@ use Modules\Core\Enums\EvidenceMode;
 final readonly class ScenarioMetadata
 {
     /** @var list<string> */
-    public array $suites;
-
-    /** @var list<string> */
     public array $capabilities;
 
     /** @var list<string> */
     public array $tags;
 
     /**
-     * @param  list<string>  $suites
      * @param  list<string>  $capabilities
      * @param  list<string>  $tags
      */
     public function __construct(
-        array $suites,
         array $capabilities,
         array $tags,
         public AutomationDisposition $disposition,
         public EvidenceMode $evidenceMode,
     ) {
-        $this->suites = $this->validatedKeys($suites);
         $this->capabilities = $this->validatedKeys($capabilities);
         $this->tags = $this->validatedKeys($tags);
     }

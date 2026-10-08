@@ -9,6 +9,8 @@ Blocking: Yes for new operator operations
 Closure Condition: superseded by a separately approved execution-channel decision
 Next Review At: `AI-PACK-TMS-OPERATION-SERVICE-LAYER-0009`
 
+Current Architecture Notice (2026-10-08): Decision 0015 retains the transport-neutral operation boundary but supersedes every legacy command/provider compatibility requirement. The active contract is one version-2 App/Component/Suite/Scenario/Variant hierarchy with no aliases, fallback projection, or dual runtime path.
+
 ## Type
 
 4. Project-level architecture decision

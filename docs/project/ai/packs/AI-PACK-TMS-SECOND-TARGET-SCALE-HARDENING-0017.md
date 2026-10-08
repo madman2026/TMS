@@ -1,10 +1,12 @@
 # AI-PACK-TMS-SECOND-TARGET-SCALE-HARDENING-0017 — Second-target proof and scale hardening
 
-Status: `draft — final stage; must be regenerated after stages 10–14 and separately approved`
+Status: `draft — stage 16 under Decision 0015; regenerate after owner-local stages 11–15`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0010–0013.
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering and compatibility assumptions. Regenerate this final Pack from accepted stages 1–15 and the single version-2 hierarchy contract.
 
 ## 1. Task ID
 

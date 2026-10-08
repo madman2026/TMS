@@ -9,19 +9,21 @@ final readonly class OperationResult
 {
     public const ERROR_CODES = [
         'operation_not_found', 'operation_request_invalid', 'operation_registry_invalid', 'operation_registry_duplicate',
-        'acceptance_app_not_found', 'acceptance_scenario_not_found', 'acceptance_profile_not_found',
+        'acceptance_app_not_found', 'acceptance_profile_not_found',
         'acceptance_selector_invalid', 'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded',
         'acceptance_variant_not_executable', 'acceptance_configuration_invalid',
         'acceptance_registry_invalid', 'acceptance_registry_duplicate', 'acceptance_catalog_invalid',
-        'acceptance_catalog_duplicate', 'acceptance_catalog_changed', 'acceptance_catalog_failed',
+        'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
+        'acceptance_catalog_changed', 'acceptance_catalog_failed',
         'acceptance_browser_start_failed', 'acceptance_result_persistence_failed',
         'acceptance_scenario_failed', 'acceptance_step_failed', 'acceptance_command_failed',
     ];
 
     public const REQUEST_FIELDS = [
-        'version', 'correlationId', 'parameters', 'app', 'scenario', 'variant', 'suite',
+        'version', 'correlationId', 'parameters', 'app', 'component', 'suite', 'scenario', 'variant',
         'capability', 'tag', 'disposition', 'evidence_mode', 'limit', 'app_key',
-        'scenario_key', 'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms',
+        'component_key', 'suite_key', 'scenario_key', 'variant_key',
+        'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms',
     ];
 
     public array $errors;
@@ -37,9 +39,9 @@ final readonly class OperationResult
         public bool $adminActionRequired = false,
         array $errors = [],
         public CatalogOperationData|RunOperationData|null $data = null,
-        public int $version = 1,
+        public int $version = 2,
     ) {
-        if ($version !== 1 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)
+        if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)
             || ($operation !== null && ! preg_match('/^[a-z0-9][a-z0-9._-]{0,63}$/D', $operation))
             || ($errorCode !== null && ! in_array($errorCode, self::ERROR_CODES, true))
             || ! self::isUuid($correlationId) || ($operationId !== null && ! self::isUuid($operationId))) {

@@ -1,10 +1,12 @@
 # AI-PACK-TMS-TARGET-RESOURCE-LIFECYCLE-0012 — Target resource lifecycle contracts
 
-Status: `draft — depends on Packs 0009–0011; normalization and separate operator approval required`
+Status: `draft — stage 5 under Decision 0015; normalize after accepted Pack 0011`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0005, 0007, 0009, 0013, and 0014; Decision 0014 applied on 2026-10-08 (documentation only).
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering and compatibility assumptions. Normalize this Draft against the single version-2 hierarchy contract before approval.
 
 ## 1. Task ID
 

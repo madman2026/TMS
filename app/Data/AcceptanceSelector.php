@@ -9,13 +9,15 @@ use Modules\Core\Enums\EvidenceMode;
 /** OR within each exact-key dimension, AND between dimensions. */
 final readonly class AcceptanceSelector
 {
-    public const OPTIONS = '{--app=*} {--scenario=*} {--variant=*} {--suite=*} {--capability=*} {--tag=*} {--disposition=*} {--evidence-mode=*} {--limit=1000}';
+    public const OPTIONS = '{--app=*} {--component=*} {--suite=*} {--scenario=*} {--variant=*} {--capability=*} {--tag=*} {--disposition=*} {--evidence-mode=*} {--limit=1000}';
 
     public array $apps;
 
     public array $scenarios;
 
     public array $variants;
+
+    public array $components;
 
     public array $suites;
 
@@ -31,6 +33,7 @@ final readonly class AcceptanceSelector
         array $apps = [],
         array $scenarios = [],
         array $variants = [],
+        array $components = [],
         array $suites = [],
         array $capabilities = [],
         array $tags = [],
@@ -42,8 +45,9 @@ final readonly class AcceptanceSelector
             throw AcceptanceCatalogException::because('acceptance_selector_invalid');
         }
         foreach ([
-            'apps' => $apps, 'scenarios' => $scenarios, 'variants' => $variants,
-            'suites' => $suites, 'capabilities' => $capabilities, 'tags' => $tags,
+            'apps' => $apps, 'components' => $components, 'suites' => $suites,
+            'scenarios' => $scenarios, 'variants' => $variants,
+            'capabilities' => $capabilities, 'tags' => $tags,
             'dispositions' => $dispositions, 'evidenceModes' => $evidenceModes,
         ] as $property => $values) {
             $copy = [];
@@ -64,8 +68,9 @@ final readonly class AcceptanceSelector
     {
         $arguments = [];
         foreach ([
-            'app' => 'apps', 'scenario' => 'scenarios', 'variant' => 'variants',
-            'suite' => 'suites', 'capability' => 'capabilities', 'tag' => 'tags',
+            'app' => 'apps', 'component' => 'components', 'suite' => 'suites',
+            'scenario' => 'scenarios', 'variant' => 'variants',
+            'capability' => 'capabilities', 'tag' => 'tags',
             'disposition' => 'dispositions', 'evidence-mode' => 'evidenceModes',
         ] as $option => $property) {
             $values = $options[$option] ?? [];
@@ -84,7 +89,12 @@ final readonly class AcceptanceSelector
 
     public function matchesScenario(ScenarioDescriptor $descriptor): bool
     {
-        foreach (['suites', 'capabilities', 'tags'] as $field) {
+        if (($this->components !== [] && ! in_array($descriptor->componentKey, $this->components, true))
+            || ($this->suites !== [] && ! in_array($descriptor->suiteKey, $this->suites, true))) {
+            return false;
+        }
+
+        foreach (['capabilities', 'tags'] as $field) {
             if ($this->$field !== [] && array_intersect($this->$field, $descriptor->metadata->$field) === []) {
                 return false;
             }
@@ -97,8 +107,9 @@ final readonly class AcceptanceSelector
     public function normalized(): array
     {
         return [
-            'app' => $this->apps, 'scenario' => $this->scenarios, 'variant' => $this->variants,
-            'suite' => $this->suites, 'capability' => $this->capabilities, 'tag' => $this->tags,
+            'app' => $this->apps, 'component' => $this->components, 'suite' => $this->suites,
+            'scenario' => $this->scenarios, 'variant' => $this->variants,
+            'capability' => $this->capabilities, 'tag' => $this->tags,
             'disposition' => $this->dispositions, 'evidence_mode' => $this->evidenceModes,
             'limit' => $this->limit,
         ];

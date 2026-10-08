@@ -2,372 +2,437 @@
 
 namespace Tests\Unit;
 
-use App\Contracts\AcceptanceCatalogProvider;
+use App\Contracts\AcceptanceComponentProvider;
 use App\Data\AcceptancePlan;
 use App\Data\AcceptanceSelector;
+use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
+use App\Data\SuiteDescriptor;
 use App\Data\VariantDescriptor;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceCatalog;
 use App\Services\AcceptancePlanner;
-use Error;
+use Closure;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 class AcceptancePlannerTest extends TestCase
 {
-    public function test_selection_order_counts_and_disposition_projections_are_exact(): void
+    public function test_plan_uses_the_full_hierarchy_tuple_and_version_two_fingerprint(): void
     {
-        $apps = [
-            $this->app('app-b', [new ScenarioDescriptor('shared', $this->metadata())], ['variant-b', 'variant-a']),
-            $this->app('app-a', array_map(
-                fn ($disposition) => new ScenarioDescriptor($disposition->value, $this->metadata($disposition)),
-                AutomationDisposition::cases(),
-            )),
-        ];
-        $plan = $this->planner($apps)->plan(new AcceptanceSelector);
+        $planner = $this->planner();
+        $selector = new AcceptanceSelector(
+            apps: ['app-a'],
+            components: ['component-a'],
+            suites: ['suite-a'],
+            scenarios: ['scenario-a'],
+            variants: ['variant-b'],
+        );
+
+        $plan = $planner->plan($selector);
+        $payload = $plan->canonicalPayload();
+
+        $this->assertSame(2, AcceptancePlan::VERSION);
+        $this->assertSame(['app-a', 'component-a', 'suite-a', 'scenario-a', 'variant-b'], [
+            $plan->items[0]->appKey,
+            $plan->items[0]->componentKey,
+            $plan->items[0]->suiteKey,
+            $plan->items[0]->scenarioKey,
+            $plan->items[0]->variantKey,
+        ]);
+        $this->assertSame(2, $payload['plan_version']);
+        $this->assertSame(['component-a'], $payload['selector']['component']);
+        $this->assertSame(['suite-a'], $payload['selector']['suite']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $plan->fingerprint);
+    }
+
+    public function test_list_includes_all_runtime_dispositions_and_plan_only_executable_rows(): void
+    {
+        $plan = $this->planner()->plan(new AcceptanceSelector);
+
         $listed = $plan->toArray(false);
-        $planned = $plan->toArray();
-        $this->assertSame([
-            'matched' => 6, 'executable' => 3, 'excluded' => 3,
-            'by_disposition' => ['automated' => 3, 'manual-only' => 1, 'blocked' => 1, 'not-implemented' => 1],
-        ], $listed['counts']);
-        $this->assertCount(6, $listed['items']);
-        $this->assertCount(3, $planned['items']);
-        $this->assertSame('listed', $listed['status']);
-        $this->assertSame('planned', $planned['status']);
-        $this->assertSame($listed['fingerprint'], $planned['fingerprint']);
-        $this->assertSame([
-            ['app-a', 'automated', 'default'], ['app-a', 'blocked', 'default'],
-            ['app-a', 'manual-only', 'default'], ['app-a', 'not-implemented', 'default'],
-            ['app-b', 'shared', 'variant-a'], ['app-b', 'shared', 'variant-b'],
-        ], array_map(fn ($row) => [$row['app_key'], $row['scenario_key'], $row['variant_key']], $listed['items']));
-        $this->assertSame([true, true, true], array_column($planned['items'], 'executable'));
-        foreach ($apps as $app) {
-            $this->assertSame(0, $app->resolutions);
-            $this->assertSame(0, $app->legacyCalls);
+        $planned = $plan->toArray(true);
+
+        $this->assertSame(['automated' => 2, 'blocked' => 1, 'not-implemented' => 0], $listed['counts']['by_disposition']);
+        $this->assertCount(3, $listed['items']);
+        $this->assertCount(2, $planned['items']);
+        $this->assertSame(['variant-a', 'variant-b'], array_column($planned['items'], 'variant_key'));
+    }
+
+    public function test_unknown_hierarchy_selector_is_rejected(): void
+    {
+        try {
+            $this->planner()->plan(new AcceptanceSelector(components: ['missing-component']));
+            $this->fail('Expected missing selector to be rejected.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_selector_not_found', $exception->errorCode);
         }
     }
 
-    public function test_exact_selectors_or_within_and_between_dimensions_and_isolate_apps(): void
+    public function test_exact_selectors_are_or_within_dimensions_and_and_between_dimensions(): void
     {
-        $selected = $this->app('app-a', [
-            new ScenarioDescriptor('first', $this->metadata(tags: ['one'])),
-            new ScenarioDescriptor('second', $this->metadata(tags: ['two'])),
-            new ScenarioDescriptor('third', $this->metadata(AutomationDisposition::BLOCKED, tags: ['two'])),
-        ], ['b', 'a']);
-        $unselected = $this->app('app-b', fn () => throw new RuntimeException('Unselected provider was visited.'));
-        $plan = $this->planner([$unselected, $selected])->plan(new AcceptanceSelector(
-            apps: ['app-a'], scenarios: ['second', 'first', 'first'], variants: ['b'],
-            suites: ['suite'], capabilities: ['cap'], tags: ['two', 'one'],
-            dispositions: ['automated'], evidenceModes: ['metadata-only'],
+        $selector = new AcceptanceSelector(
+            components: ['component-a'],
+            suites: ['suite-a'],
+            scenarios: ['scenario-b', 'scenario-a'],
+            variants: ['variant-b', 'blocked-variant'],
+            capabilities: ['capability-a'],
+            tags: ['tag-a'],
+        );
+        $plan = $this->planner()->plan($selector);
+
+        $this->assertSame([
+            ['scenario-a', 'variant-b'],
+            ['scenario-b', 'blocked-variant'],
+        ], array_map(fn ($item): array => [$item->scenarioKey, $item->variantKey], $plan->items));
+
+        $empty = $this->planner()->plan(new AcceptanceSelector(
+            scenarios: ['scenario-a'],
+            dispositions: ['blocked'],
         ));
-        $this->assertSame(['first', 'second'], array_column($plan->toArray()['items'], 'scenario_key'));
-        $this->assertSame(['b', 'b'], array_column($plan->toArray()['items'], 'variant_key'));
-        $this->assertSame(0, $unselected->descriptions);
-        $this->assertSame(0, $unselected->versionReads);
+        $this->assertSame([], $empty->items);
+
+        $knownButDisjoint = $this->planner()->plan(new AcceptanceSelector(
+            scenarios: ['scenario-a'],
+            variants: ['blocked-variant'],
+        ));
+        $this->assertSame([], $knownButDisjoint->items);
     }
 
-    public function test_unknown_terms_are_validated_in_the_declared_scope_and_known_disjoint_filters_are_empty(): void
+    public function test_unknown_terms_are_rejected_across_every_hierarchy_and_classification_dimension(): void
     {
-        $app = $this->app('app-a', [
-            new ScenarioDescriptor('first', $this->metadata(tags: ['one'])),
-            new ScenarioDescriptor('second', $this->metadata(tags: ['two'])),
-        ], ['default']);
-        $planner = $this->planner([$app]);
-        foreach (['scenarios', 'variants', 'suites', 'capabilities', 'tags'] as $field) {
-            $this->assertError('acceptance_selector_not_found', fn () => $planner->plan(new AcceptanceSelector(...[
-                $field => ['missing'],
-            ])));
+        foreach (['components', 'suites', 'scenarios', 'variants', 'capabilities', 'tags'] as $field) {
+            try {
+                $this->planner()->plan(new AcceptanceSelector(...[$field => ['missing']]));
+                $this->fail('Expected unknown selector term.');
+            } catch (AcceptanceCatalogException $exception) {
+                $this->assertSame('acceptance_selector_not_found', $exception->errorCode);
+                $this->assertNull($exception->getPrevious());
+            }
         }
-        $this->assertError('acceptance_app_not_found', fn () => $planner->plan(new AcceptanceSelector(apps: ['missing'])));
-        $this->assertEmpty($planner->plan(new AcceptanceSelector(scenarios: ['first'], tags: ['two']))->items);
-        $this->assertEmpty($planner->plan(new AcceptanceSelector(dispositions: ['manual-only']))->items);
-        $empty = $this->planner([])->plan(new AcceptanceSelector)->toArray();
-        $this->assertSame(0, $empty['counts']['matched']);
-        $this->assertSame([], $empty['items']);
-        $this->assertSame('{}', json_encode($empty['catalog_versions']));
-        $this->assertSame(64, strlen($empty['fingerprint']));
 
-        // A requested variant remains known even when classifications exclude its Scenario.
-        $this->assertEmpty($planner->plan(new AcceptanceSelector(
-            scenarios: ['first'], variants: ['default'], dispositions: ['blocked'],
-        ))->items);
-        $this->assertError('acceptance_selector_not_found', fn () => $planner->plan(new AcceptanceSelector(
-            variants: ['missing'], dispositions: ['blocked'],
-        )));
+        try {
+            $this->planner()->plan(new AcceptanceSelector(apps: ['missing']));
+            $this->fail('Expected unknown app.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_app_not_found', $exception->errorCode);
+        }
     }
 
-    public function test_filtered_scenarios_do_not_expand_variants_unless_variant_vocabulary_is_requested(): void
-    {
-        $app = $this->app('app-a', [new ScenarioDescriptor('first', $this->metadata())]);
-        $this->planner([$app])->plan(new AcceptanceSelector(dispositions: ['blocked']));
-        $this->assertSame(0, $app->variantCalls);
-        $this->planner([$app])->plan(new AcceptanceSelector(variants: ['default'], dispositions: ['blocked']));
-        $this->assertSame(1, $app->variantCalls);
-    }
-
-    public function test_selector_grammar_enum_and_limit_validation_and_defensive_copy(): void
+    public function test_selector_validation_and_defensive_copy_are_strict(): void
     {
         foreach ([
-            ['app' => ['*']], ['app' => ['a,b']], ['app' => ["app-a\n"]],
-            ['tag' => ['example-token-sentinel/invalid']], ['suite' => [new \stdClass]],
-            ['app' => 'app-a'], ['disposition' => ['unsupported']], ['evidence-mode' => ['unsupported']],
-            ['limit' => '0'], ['limit' => '-1'], ['limit' => '1001'], ['limit' => '1.0'],
-            ['limit' => str_repeat('9', 100)], ['limit' => ''], ['limit' => 1],
-        ] as $options) {
-            $this->assertError('acceptance_selector_invalid', fn () => AcceptanceSelector::fromOptions($options));
+            fn () => new AcceptanceSelector(components: ['Invalid']),
+            fn () => new AcceptanceSelector(dispositions: ['unknown']),
+            fn () => new AcceptanceSelector(evidenceModes: ['unknown']),
+            fn () => new AcceptanceSelector(limit: 0),
+            fn () => AcceptanceSelector::fromOptions(['limit' => 1000]),
+            fn () => AcceptanceSelector::fromOptions(['limit' => '1001']),
+            fn () => AcceptanceSelector::fromOptions(['component' => 'component-a']),
+        ] as $construct) {
+            try {
+                $construct();
+                $this->fail('Expected invalid selector.');
+            } catch (AcceptanceCatalogException $exception) {
+                $this->assertSame('acceptance_selector_invalid', $exception->errorCode);
+                $this->assertNull($exception->getPrevious());
+            }
         }
-        $appKey = 'app-b';
-        $keys = [&$appKey, 'app-a', 'app-b'];
-        $selector = new AcceptanceSelector(apps: $keys);
-        $appKey = 'example-token-sentinel/invalid';
-        $this->assertSame(['app-a', 'app-b'], $selector->apps);
-        $this->assertSame(1, AcceptanceSelector::fromOptions(['limit' => '0001'])->limit);
-        try {
-            $selector->apps[0] = 'changed';
-            $this->fail('Selector collections must be immutable.');
-        } catch (Error) {
-            $this->assertSame(['app-a', 'app-b'], $selector->apps);
-        }
+
+        $component = 'component-a';
+        $components = [&$component, 'component-a'];
+        $selector = new AcceptanceSelector(components: $components);
+        $component = 'changed';
+        $components[] = 'later';
+        $this->assertSame(['component-a'], $selector->components);
     }
 
-    public function test_canonical_fingerprint_ignores_order_and_private_state_but_tracks_approved_inputs(): void
+    public function test_fingerprint_is_canonical_and_tracks_approved_inputs(): void
     {
-        $a = new ScenarioDescriptor('first', $this->metadata(tags: ['two', 'one']));
-        $b = new ScenarioDescriptor('second', $this->metadata(tags: ['one', 'two']));
-        $app = $this->app('app-a', [$b, $a], ['b', 'a']);
-        $planner = $this->planner([$app]);
-        $selector = new AcceptanceSelector(tags: ['two', 'one', 'two']);
-        $first = $planner->plan($selector);
-        $app->definitions = [$a, $b];
-        $app->variantKeys = ['a', 'b'];
-        $app->privateState = 'another-inert-value';
-        $second = $planner->plan(new AcceptanceSelector(tags: ['one', 'two']));
+        [$planner, $provider] = $this->plannerAndProvider();
+        $first = $planner->plan(new AcceptanceSelector(
+            scenarios: ['scenario-b', 'scenario-a'],
+            variants: ['variant-b', 'variant-a', 'blocked-variant'],
+        ));
+        $second = $planner->plan(new AcceptanceSelector(
+            variants: ['blocked-variant', 'variant-a', 'variant-b'],
+            scenarios: ['scenario-a', 'scenario-b'],
+        ));
+
         $this->assertSame($first->fingerprint, $second->fingerprint);
-        $this->assertSame(
-            hash('sha256', json_encode($first->canonicalPayload(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)),
-            $first->fingerprint,
-        );
-        $canonical = json_encode($first->canonicalPayload(), JSON_THROW_ON_ERROR);
-        foreach (['example-credential-sentinel', 'example-session-sentinel', 'example-token-sentinel', 'another-inert-value'] as $sentinel) {
-            $this->assertStringNotContainsString($sentinel, $canonical);
-        }
-        $this->assertSame(['plan_version', 'selector', 'catalog_versions', 'items'], array_keys($first->canonicalPayload()));
-        $app->revision = 'v2';
-        $this->assertNotSame($first->fingerprint, $planner->plan($selector)->fingerprint);
-        $app->revision = 'v1';
-        $app->variantKeys = ['a', 'c'];
-        $this->assertNotSame($first->fingerprint, $planner->plan($selector)->fingerprint);
-        $app->variantKeys = ['a', 'b'];
-        $app->definitions = [new ScenarioDescriptor('first', $this->metadata(tags: ['one', 'two', 'three'])), $b];
-        $this->assertNotSame($first->fingerprint, $planner->plan($selector)->fingerprint);
-        $this->assertNotSame($first->fingerprint, $planner->plan(new AcceptanceSelector(tags: ['one']))->fingerprint);
-        $this->assertNotSame($first->fingerprint, $planner->plan(new AcceptanceSelector(tags: ['one', 'two'], limit: 10))->fingerprint);
+        $this->assertEquals($first->canonicalPayload(), $second->canonicalPayload());
 
-        $item = $first->items[0];
-        $items = [&$item];
-        $version = 'v1';
-        $versions = ['app-a' => &$version];
-        $copy = new AcceptancePlan(new AcceptanceSelector, $items, $versions);
-        $item = $first->items[1];
-        $version = 'v2';
-        $this->assertSame($first->items[0], $copy->items[0]);
-        $this->assertSame(['app-a' => 'v1'], $copy->catalogVersions);
+        $differentLimit = $planner->plan(new AcceptanceSelector(limit: 999));
+        $this->assertNotSame($first->fingerprint, $differentLimit->fingerprint);
+
+        $provider->version = 'v3';
+        $differentVersion = $planner->plan(new AcceptanceSelector);
+        $this->assertNotSame($differentLimit->fingerprint, $differentVersion->fingerprint);
     }
 
-    public function test_matched_row_limit_stops_large_variant_generator_without_returning_a_partial_plan(): void
+    public function test_filtered_scenarios_do_not_expand_unselected_variants(): void
     {
-        foreach ([1, 1000] as $limit) {
-            $observed = 0;
-            $app = $this->app('app-a', [new ScenarioDescriptor('first', $this->metadata())],
-                function () use (&$observed, $limit): iterable {
-                    for ($i = 1; $i <= $limit + 2; $i++) {
-                        $observed++;
-                        if ($observed > $limit + 1) {
-                            throw new RuntimeException('Over-enumerated the provider.');
-                        }
-                        yield new VariantDescriptor('variant-'.$i);
-                    }
-                },
-            );
-            $this->assertError('acceptance_catalog_limit_exceeded', fn () => $this->planner([$app])->plan(new AcceptanceSelector(limit: $limit)));
-            $this->assertSame($limit + 1, $observed);
-            $this->assertSame(0, $app->resolutions);
+        [$planner, $provider] = $this->plannerAndProvider();
+
+        $planner->plan(new AcceptanceSelector(scenarios: ['scenario-b']));
+
+        $this->assertSame(['scenario-b'], $provider->variantCalls);
+
+        [$planner, $provider] = $this->plannerAndProvider();
+        $plan = $planner->plan(new AcceptanceSelector(
+            scenarios: ['scenario-a'],
+            variants: ['blocked-variant'],
+        ));
+        $this->assertSame([], $plan->items);
+        $this->assertSame(['scenario-a', 'scenario-b'], $provider->variantCalls);
+    }
+
+    public function test_matched_row_limit_fails_without_returning_a_partial_plan(): void
+    {
+        [$planner, $provider] = $this->plannerAndProvider();
+
+        try {
+            $planner->plan(new AcceptanceSelector(limit: 1));
+            $this->fail('Expected row limit failure.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_limit_exceeded', $exception->errorCode);
+            $this->assertSame(['scenario-a'], $provider->variantCalls);
         }
     }
 
-    public function test_visit_budget_is_shared_across_apps_and_counts_filtered_descriptors(): void
+    public function test_version_drift_is_detected_before_fingerprinting(): void
+    {
+        [$planner, $provider] = $this->plannerAndProvider();
+        $provider->changeVersionAfter = 1;
+
+        try {
+            $planner->plan(new AcceptanceSelector);
+            $this->fail('Expected version drift failure.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_changed', $exception->errorCode);
+            $this->assertGreaterThanOrEqual(2, $provider->versionCalls);
+        }
+    }
+
+    public function test_visit_budget_is_shared_across_apps_and_counts_filtered_hierarchy_rows(): void
     {
         $observed = ['app-a' => 0, 'app-b' => 0];
-        $apps = [];
-        foreach (array_keys($observed) as $key) {
-            $apps[] = $this->app($key, function () use (&$observed, $key): iterable {
-                for ($i = 1; $i <= 6000; $i++) {
+        $first = $this->provider('app-a');
+        $second = $this->provider('app-b');
+        foreach (['app-a' => $first, 'app-b' => $second] as $key => $provider) {
+            $provider->componentsFactory = function () use (&$observed, $key): iterable {
+                for ($index = 0; $index < 6000; $index++) {
                     $observed[$key]++;
-                    yield new ScenarioDescriptor('scenario-'.$i, $this->metadata());
+                    yield new ComponentDescriptor($index === 0 ? 'component-a' : 'component-'.$index);
                 }
-            });
+            };
         }
-        $this->assertError('acceptance_catalog_limit_exceeded', fn () => $this->planner($apps)->plan(
-            new AcceptanceSelector(dispositions: ['blocked']),
-        ));
-        $this->assertSame(['app-a' => 6000, 'app-b' => 4001], $observed);
-        $this->assertSame([0, 0], array_map(fn ($app) => $app->variantCalls, $apps));
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($first);
+        $registry->register($second);
+        $planner = new AcceptancePlanner(new AcceptanceCatalog($registry));
+
+        try {
+            $planner->plan(new AcceptanceSelector(dispositions: ['blocked']));
+            $this->fail('Expected the shared hierarchy budget to stop traversal.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_limit_exceeded', $exception->errorCode);
+            $this->assertSame(3997, $observed['app-b']);
+            $this->assertSame([], $second->variantCalls);
+        }
     }
 
-    public function test_large_plan_at_budget_is_complete_and_repeatable_without_materialization(): void
+    public function test_plan_at_item_limit_is_complete_repeatable_and_never_resolves_runtime_code(): void
     {
-        $observed = 0;
-        $app = $this->app('app-a', [new ScenarioDescriptor('first', $this->metadata())],
-            function () use (&$observed): iterable {
-                for ($i = 1; $i <= 1000; $i++) {
-                    $observed++;
-                    yield new VariantDescriptor('variant-'.$i);
-                }
-            },
-        );
-        $planner = $this->planner([$app]);
-        $first = $planner->plan(new AcceptanceSelector);
-        $second = $planner->plan(new AcceptanceSelector);
+        [$planner, $provider] = $this->plannerAndProvider();
+        $provider->variantsFactory = function (string $scenarioKey): iterable {
+            if ($scenarioKey !== 'scenario-a') {
+                yield new VariantDescriptor('blocked-variant');
+
+                return;
+            }
+            for ($index = 1; $index <= 1000; $index++) {
+                yield new VariantDescriptor('variant-'.$index);
+            }
+        };
+
+        $first = $planner->plan(new AcceptanceSelector(scenarios: ['scenario-a']));
+        $second = $planner->plan(new AcceptanceSelector(scenarios: ['scenario-a']));
+
         $this->assertCount(1000, $first->items);
         $this->assertSame($first->fingerprint, $second->fingerprint);
         $this->assertSame(1000, $first->toArray()['counts']['matched']);
         $this->assertSame(1000, $first->toArray()['counts']['executable']);
         $this->assertSame(0, $first->toArray()['counts']['excluded']);
-        $this->assertSame(2000, $observed);
-        $this->assertSame(0, $app->resolutions);
-        $this->assertSame(0, $app->legacyCalls);
-    }
-
-    public function test_version_drift_and_duplicates_in_excluded_visited_rows_fail_closed(): void
-    {
-        $descriptor = new ScenarioDescriptor('first', $this->metadata());
-        $app = $this->app('app-a', [$descriptor]);
-        $app->definitions = function () use ($app, $descriptor): iterable {
-            yield $descriptor;
-            $app->revision = 'v2';
-        };
-        $this->assertError('acceptance_catalog_changed', fn () => $this->planner([$app])->plan(new AcceptanceSelector));
-
-        $app->definitions = [$descriptor, $descriptor];
-        $this->assertError('acceptance_catalog_duplicate', fn () => $this->planner([$app])->plan(
-            new AcceptanceSelector(dispositions: ['blocked']),
-        ));
-        $app->definitions = [$descriptor];
-        $app->variantKeys = ['default', 'default'];
-        $this->assertError('acceptance_catalog_duplicate', fn () => $this->planner([$app])->plan(
-            new AcceptanceSelector(variants: ['default'], dispositions: ['blocked']),
-        ));
-    }
-
-    private function assertError(string $code, callable $action): void
-    {
-        try {
-            $action();
-            $this->fail('Expected a catalog failure.');
-        } catch (AcceptanceCatalogException $exception) {
-            $this->assertSame($code, $exception->errorCode);
-            $this->assertNull($exception->getPrevious());
-            $this->assertStringNotContainsString('example-token-sentinel', $exception->getMessage());
-        }
+        $this->assertSame(['variant-1', 'variant-10'], [
+            $first->items[0]->variantKey,
+            $first->items[1]->variantKey,
+        ]);
     }
 
     public function test_later_provider_changes_to_an_earlier_app_are_detected_before_fingerprinting(): void
     {
-        $descriptor = new ScenarioDescriptor('first', $this->metadata());
-        $first = $this->app('app-a', [$descriptor]);
-        $second = $this->app('app-b', function () use ($first, $descriptor): iterable {
-            $first->revision = 'v2';
-            yield $descriptor;
-        });
-        $this->assertError('acceptance_catalog_changed', fn () => $this->planner([$first, $second])->plan(new AcceptanceSelector));
-        $this->assertSame(0, $first->resolutions);
-        $this->assertSame(0, $second->resolutions);
-    }
-
-    private function metadata(AutomationDisposition $disposition = AutomationDisposition::AUTOMATED, array $tags = ['one']): ScenarioMetadata
-    {
-        return new ScenarioMetadata(['suite'], ['cap'], $tags, $disposition, EvidenceMode::METADATA_ONLY);
-    }
-
-    private function planner(array $apps): AcceptancePlanner
-    {
+        $first = $this->provider('app-a');
+        $second = $this->provider('app-b');
+        $second->scenariosFactory = function () use ($first): iterable {
+            $first->version = 'v3';
+            yield new ScenarioDescriptor(
+                'scenario-a', 'component-a', 'suite-a', $this->metadata(AutomationDisposition::AUTOMATED),
+            );
+            yield new ScenarioDescriptor(
+                'scenario-b', 'component-a', 'suite-a', $this->metadata(AutomationDisposition::BLOCKED),
+            );
+        };
         $registry = new AcceptanceAppRegistry;
-        foreach ($apps as $app) {
-            $registry->register($app);
-        }
+        $registry->register($first);
+        $registry->register($second);
 
-        return new AcceptancePlanner(new AcceptanceCatalog($registry));
+        try {
+            (new AcceptancePlanner(new AcceptanceCatalog($registry)))->plan(new AcceptanceSelector);
+            $this->fail('Expected cross-app version drift.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_changed', $exception->errorCode);
+        }
     }
 
-    private function app(string $key, array|callable $definitions, array|callable $variants = ['default']): AcceptanceCatalogProvider
+    public function test_shared_hierarchy_keys_across_apps_remain_distinct_tuples(): void
     {
-        return new class($key, $definitions, $variants) implements AcceptanceCatalogProvider
+        $first = $this->provider('app-a');
+        $second = $this->provider('app-b');
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($second);
+        $registry->register($first);
+        $plan = (new AcceptancePlanner(new AcceptanceCatalog($registry)))->plan(new AcceptanceSelector);
+
+        $this->assertSame([
+            'app-a', 'app-a', 'app-a', 'app-b', 'app-b', 'app-b',
+        ], array_column($plan->toArray(false)['items'], 'app_key'));
+        $this->assertCount(6, $plan->items);
+    }
+
+    private function planner(): AcceptancePlanner
+    {
+        return $this->plannerAndProvider()[0];
+    }
+
+    /** @return array{AcceptancePlanner, AcceptanceComponentProvider} */
+    private function plannerAndProvider(): array
+    {
+        $provider = $this->provider('app-a');
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($provider);
+
+        return [new AcceptancePlanner(new AcceptanceCatalog($registry)), $provider];
+    }
+
+    private function provider(string $appKey): AcceptanceComponentProvider
+    {
+        $automated = $this->metadata(AutomationDisposition::AUTOMATED);
+        $blocked = $this->metadata(AutomationDisposition::BLOCKED);
+
+        return new class($appKey, $automated, $blocked) implements AcceptanceComponentProvider
         {
-            public int $descriptions = 0;
+            public string $version = 'v2';
 
-            public int $variantCalls = 0;
+            public int $versionCalls = 0;
 
-            public int $resolutions = 0;
+            public ?int $changeVersionAfter = null;
 
-            public int $legacyCalls = 0;
+            public array $variantCalls = [];
 
-            public int $versionReads = 0;
+            public ?Closure $componentsFactory = null;
 
-            public string $revision = 'v1';
+            public ?Closure $scenariosFactory = null;
 
-            public string $privateState = 'example-credential-sentinel|example-session-sentinel|example-token-sentinel';
+            public ?Closure $variantsFactory = null;
 
-            public function __construct(private string $key, public mixed $definitions, public mixed $variantKeys) {}
+            public function __construct(
+                private readonly string $appKey,
+                private readonly ScenarioMetadata $automated,
+                private readonly ScenarioMetadata $blocked,
+            ) {}
 
             public function key(): string
             {
-                return $this->key;
+                return $this->appKey;
             }
 
             public function catalogVersion(): string
             {
-                $this->versionReads++;
+                $this->versionCalls++;
 
-                return $this->revision;
+                return $this->changeVersionAfter !== null && $this->versionCalls > $this->changeVersionAfter
+                    ? 'changed'
+                    : $this->version;
             }
 
-            public function descriptors(): iterable
+            public function components(): iterable
             {
-                $this->descriptions++;
-                yield from is_callable($this->definitions) ? ($this->definitions)() : $this->definitions;
-            }
-
-            public function variants(string $scenarioKey): iterable
-            {
-                $this->variantCalls++;
-                if (is_callable($this->variantKeys)) {
-                    yield from ($this->variantKeys)();
+                if ($this->componentsFactory !== null) {
+                    yield from ($this->componentsFactory)();
 
                     return;
                 }
-                foreach ($this->variantKeys as $key) {
-                    yield new VariantDescriptor($key);
-                }
+
+                yield new ComponentDescriptor('component-a');
             }
 
-            public function resolveScenario(string $scenarioKey, string $variantKey): ?AcceptanceScenario
+            public function suites(): iterable
             {
-                $this->resolutions++;
-                throw new RuntimeException($this->privateState);
+                yield new SuiteDescriptor('suite-a', 'component-a');
             }
 
             public function scenarios(): iterable
             {
-                $this->legacyCalls++;
-                throw new RuntimeException($this->privateState);
+                if ($this->scenariosFactory !== null) {
+                    yield from ($this->scenariosFactory)();
+
+                    return;
+                }
+
+                yield new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $this->automated);
+                yield new ScenarioDescriptor('scenario-b', 'component-a', 'suite-a', $this->blocked);
+            }
+
+            public function variants(string $scenarioKey): iterable
+            {
+                $this->variantCalls[] = $scenarioKey;
+                if ($this->variantsFactory !== null) {
+                    yield from ($this->variantsFactory)($scenarioKey);
+
+                    return;
+                }
+
+                if ($scenarioKey === 'scenario-a') {
+                    yield new VariantDescriptor('variant-a');
+                    yield new VariantDescriptor('variant-b');
+                } else {
+                    yield new VariantDescriptor('blocked-variant');
+                }
+            }
+
+            public function resolveScenario(
+                string $componentKey,
+                string $suiteKey,
+                string $scenarioKey,
+                string $variantKey,
+            ): ?AcceptanceScenario {
+                return null;
             }
         };
+    }
+
+    private function metadata(AutomationDisposition $disposition): ScenarioMetadata
+    {
+        return new ScenarioMetadata(
+            ['capability-a'],
+            ['tag-a'],
+            $disposition,
+            EvidenceMode::METADATA_ONLY,
+        );
     }
 }

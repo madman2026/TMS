@@ -10,8 +10,7 @@ final readonly class RunResult
      * @param  array<int, StepResult>  $steps
      */
     public function __construct(
-        public string $appKey,
-        public string $scenarioKey,
+        public AcceptanceExecutionIdentity $identity,
         public string $scenarioName,
         public bool $passed,
         public float $duration,

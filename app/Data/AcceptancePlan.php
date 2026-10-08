@@ -8,7 +8,7 @@ use Modules\Core\Enums\AutomationDisposition;
 /** Bounded observed selection; no global catalog or source-revision guarantee. */
 final readonly class AcceptancePlan
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** @var list<AcceptancePlanItem> */
     public array $items;

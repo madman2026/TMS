@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
 use Modules\Core\Data\ScenarioMetadata;
@@ -30,48 +30,41 @@ class AcceptanceRunPersistenceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_persists_a_finished_run_outside_the_browser_transaction(): void
+    public function test_it_persists_the_complete_identity_and_safe_finished_steps(): void
     {
-        [$app, $scenario] = $this->appAndScenario();
-        $transactionLevel = DB::transactionLevel();
+        $identity = $this->identity();
+        $scenario = $this->scenario();
         $runner = Mockery::mock(AcceptanceRunner::class);
-        $runner->shouldReceive('run')
-            ->once()
-            ->andReturnUsing(function () use ($transactionLevel): RunResult {
-                $this->assertSame($transactionLevel, DB::transactionLevel());
+        $runner->shouldReceive('run')->once()->withArgs(
+            fn (AcceptanceExecutionIdentity $actual, AcceptanceScenario $actualScenario): bool => $actual->value() === $identity->value()
+                && $actualScenario === $scenario,
+        )->andReturn(new RunResult(
+            identity: $identity,
+            scenarioName: 'Scenario A',
+            passed: true,
+            duration: 0.25,
+            steps: [new StepResult(
+                name: 'first',
+                passed: true,
+                duration: 0.25,
+                results: ['password' => 'example-sensitive-value'],
+            )],
+        ));
 
-                return new RunResult(
-                    appKey: 'local-app',
-                    scenarioKey: 'local-scenario',
-                    scenarioName: 'Local scenario',
-                    passed: true,
-                    duration: 0.25,
-                    steps: [
-                        new StepResult(
-                            name: 'first',
-                            passed: true,
-                            duration: 0.1,
-                            results: ['password' => 'example-sensitive-value'],
-                            description: 'First local step',
-                        ),
-                        new StepResult(name: 'second', passed: true, duration: 0.15),
-                    ],
-                );
-            });
-
-        $test = (new AcceptanceRunService($runner))->run(
-            $this->profile(),
-            $app,
-            $scenario,
-            new RunOptions,
-        );
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $scenario, new RunOptions);
 
         $this->assertSame(TestStatusEnum::FINISHED, $test->status);
-        $this->assertSame('local-app', $test->app_key);
-        $this->assertSame('local-scenario', $test->scenario_key);
+        $this->assertSame([
+            'app-a', 'component-a', 'suite-a', 'scenario-a', 'variant-a',
+        ], [
+            $test->app_key,
+            $test->component_key,
+            $test->suite_key,
+            $test->scenario_key,
+            $test->variant_key,
+        ]);
+        $this->assertCount(1, $test->steps);
         $this->assertNull($test->data);
-        $this->assertCount(2, $test->steps);
-        $this->assertSame(TestStatusEnum::FINISHED, $test->steps[0]->status);
         $this->assertNull($test->steps[0]->data);
         $this->assertStringNotContainsString(
             'example-sensitive-value',
@@ -79,15 +72,39 @@ class AcceptanceRunPersistenceTest extends TestCase
         );
     }
 
-    public function test_it_persists_and_logs_a_failed_step_without_raw_sensitive_data(): void
+    public function test_it_persists_and_logs_failure_with_the_complete_safe_identity(): void
     {
         Log::spy();
-        [$app, $scenario] = $this->appAndScenario();
+        $identity = $this->identity();
+        $runner = Mockery::mock(AcceptanceRunner::class);
+        $runner->shouldReceive('run')->once()->andThrow(
+            AcceptanceExecutionException::browserStartFailed(new RuntimeException('example-sensitive-value')),
+        );
+
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario());
+
+        $this->assertSame(TestStatusEnum::FAILED, $test->status);
+        $this->assertSame('acceptance_browser_start_failed', $test->error_code);
+        Log::shouldHaveReceived('error')->once()->with(
+            'tms.acceptance.run.failed',
+            Mockery::on(fn (array $context): bool => $context['test_id'] === $test->id
+                && $context['app_key'] === 'app-a'
+                && $context['component_key'] === 'component-a'
+                && $context['suite_key'] === 'suite-a'
+                && $context['scenario_key'] === 'scenario-a'
+                && $context['variant_key'] === 'variant-a'
+                && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'example-sensitive-value')),
+        );
+    }
+
+    public function test_it_persists_failed_steps_without_raw_error_content(): void
+    {
+        Log::spy();
+        $identity = $this->identity();
         $runner = Mockery::mock(AcceptanceRunner::class);
         $runner->shouldReceive('run')->once()->andReturn(new RunResult(
-            appKey: 'local-app',
-            scenarioKey: 'local-scenario',
-            scenarioName: 'Local scenario',
+            identity: $identity,
+            scenarioName: 'Scenario A',
             passed: false,
             duration: 0.1,
             steps: [new StepResult(
@@ -102,61 +119,31 @@ class AcceptanceRunPersistenceTest extends TestCase
             errorCode: 'acceptance_step_failed',
         ));
 
-        $test = (new AcceptanceRunService($runner))->run($this->profile(), $app, $scenario);
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario());
 
         $this->assertSame(TestStatusEnum::FAILED, $test->status);
         $this->assertSame('acceptance_step_failed', $test->error_code);
         $this->assertSame(TestStatusEnum::FAILED, $test->steps[0]->status);
         $this->assertSame('Step failed.', $test->steps[0]->error_message);
-        $this->assertStringNotContainsString(
-            'example-sensitive-value',
-            json_encode($test->load('steps')->toArray(), JSON_THROW_ON_ERROR),
-        );
+        $this->assertStringNotContainsString('example-sensitive-value', json_encode($test->load('steps')->toArray(), JSON_THROW_ON_ERROR));
         Log::shouldHaveReceived('warning')->once()->with(
             'tms.acceptance.step.failed',
-            Mockery::on(fn (array $context): bool => $context['test_id'] === $test->id
+            Mockery::on(fn (array $context): bool => $context['component_key'] === 'component-a'
+                && $context['suite_key'] === 'suite-a'
+                && $context['variant_key'] === 'variant-a'
                 && $context['error_code'] === 'acceptance_step_failed'
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'example-sensitive-value')),
         );
     }
 
-    public function test_it_records_a_normalized_runner_failure(): void
+    public function test_it_normalizes_a_final_persistence_failure_and_keeps_the_tuple(): void
     {
         Log::spy();
-        [$app, $scenario] = $this->appAndScenario();
-        $runner = Mockery::mock(AcceptanceRunner::class);
-        $runner->shouldReceive('run')->once()->andThrow(
-            AcceptanceExecutionException::browserStartFailed(
-                new RuntimeException('example-sensitive-value'),
-            ),
-        );
-
-        $test = (new AcceptanceRunService($runner))->run($this->profile(), $app, $scenario);
-
-        $this->assertSame(TestStatusEnum::FAILED, $test->status);
-        $this->assertSame('acceptance_browser_start_failed', $test->error_code);
-        $this->assertStringNotContainsString(
-            'example-sensitive-value',
-            json_encode($test->toArray(), JSON_THROW_ON_ERROR),
-        );
-        Log::shouldHaveReceived('error')->once()->with(
-            'tms.acceptance.run.failed',
-            Mockery::on(fn (array $context): bool => $context['test_id'] === $test->id
-                && $context['error_code'] === 'acceptance_browser_start_failed'
-                && $context['retryable'] === true
-                && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'example-sensitive-value')),
-        );
-    }
-
-    public function test_it_normalizes_a_final_persistence_failure(): void
-    {
-        Log::spy();
-        [$app, $scenario] = $this->appAndScenario();
+        $identity = $this->identity();
         $runner = Mockery::mock(AcceptanceRunner::class);
         $runner->shouldReceive('run')->once()->andReturn(new RunResult(
-            appKey: 'local-app',
-            scenarioKey: 'local-scenario',
-            scenarioName: 'Local scenario',
+            identity: $identity,
+            scenarioName: 'Scenario A',
             passed: true,
             duration: 0.1,
             steps: [],
@@ -170,8 +157,8 @@ class AcceptanceRunPersistenceTest extends TestCase
         };
 
         try {
-            $service->run($this->profile(), $app, $scenario);
-            $this->fail('Expected an AcceptanceExecutionException.');
+            $service->run($this->profile(), $identity, $this->scenario());
+            $this->fail('Expected a normalized persistence failure.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_result_persistence_failed', $exception->errorCode);
             $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
@@ -180,67 +167,89 @@ class AcceptanceRunPersistenceTest extends TestCase
         $test = TestRun::query()->latest('id')->firstOrFail();
         $this->assertSame(TestStatusEnum::FAILED, $test->status);
         $this->assertSame('acceptance_result_persistence_failed', $test->error_code);
+        $this->assertSame($this->identityColumns(), $test->only(array_keys($this->identityColumns())));
     }
 
-    public function test_acceptance_metadata_migration_can_roll_back_and_reapply_in_memory(): void
+    public function test_identity_migration_is_reversible_while_tests_are_empty(): void
     {
-        $migration = require database_path(
-            'migrations/2026_09_23_000001_add_acceptance_execution_fields_to_tests_and_steps_tables.php',
+        $migration = require database_path('migrations/2026_10_08_000001_cut_over_acceptance_execution_identity.php');
+
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('tests', 'component_key'));
+        $migration->up();
+
+        foreach (['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key'] as $column) {
+            $this->assertTrue(Schema::hasColumn('tests', $column));
+        }
+        $columns = collect(DB::select("PRAGMA table_info('tests')"))->keyBy('name');
+        foreach (['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key'] as $column) {
+            $this->assertSame(1, $columns[$column]->notnull);
+        }
+        $this->assertContains(
+            'tests_acceptance_identity_created_index',
+            collect(DB::select("PRAGMA index_list('tests')"))->pluck('name'),
         );
+    }
+
+    public function test_forward_identity_migration_refuses_non_empty_test_history_before_mutation(): void
+    {
+        $profile = $this->profile();
+        $migration = require database_path('migrations/2026_10_08_000001_cut_over_acceptance_execution_identity.php');
+        $migration->down();
+        $profile->tests()->create([
+            'name' => 'Existing scenario',
+            'app_key' => 'app-a',
+            'scenario_key' => 'scenario-a',
+            'status' => TestStatusEnum::FINISHED,
+        ]);
 
         try {
-            $migration->down();
-            $this->assertFalse(Schema::hasColumn('tests', 'app_key'));
-            $this->assertFalse(Schema::hasColumn('steps', 'status'));
-        } finally {
             $migration->up();
+            $this->fail('Expected non-empty Test history to stop migration.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('acceptance_identity_migration_requires_empty_tests', $exception->getMessage());
         }
-
-        $this->assertTrue(Schema::hasColumn('tests', 'app_key'));
-        $this->assertTrue(Schema::hasColumn('steps', 'status'));
-
-        $testColumns = collect(DB::select("PRAGMA table_info('tests')"))->keyBy('name');
-        $stepColumns = collect(DB::select("PRAGMA table_info('steps')"))->keyBy('name');
-        $testIndexes = collect(DB::select("PRAGMA index_list('tests')"))->pluck('name');
-        $stepIndexes = collect(DB::select("PRAGMA index_list('steps')"))->pluck('name');
-
-        $this->assertSame(0, $testColumns['app_key']->notnull);
-        $this->assertSame(0, $testColumns['scenario_key']->notnull);
-        $this->assertSame(0, $testColumns['error_code']->notnull);
-        $this->assertSame(0, $stepColumns['status']->notnull);
-        $this->assertSame(1, $stepColumns['critical']->notnull);
-        $this->assertSame("'1'", $stepColumns['critical']->dflt_value);
-        $this->assertSame(0, $stepColumns['error_code']->notnull);
-        $this->assertSame(0, $stepColumns['error_message']->notnull);
-        $this->assertContains('tests_app_scenario_created_index', $testIndexes);
-        $this->assertContains('steps_test_status_index', $stepIndexes);
+        $this->assertFalse(Schema::hasColumn('tests', 'component_key'));
+        $this->assertDatabaseCount('tests', 1);
     }
 
-    /**
-     * @return array{AcceptanceApp, AcceptanceScenario}
-     */
-    private function appAndScenario(): array
+    private function identity(): AcceptanceExecutionIdentity
     {
-        $scenario = new class implements AcceptanceScenario
+        return new AcceptanceExecutionIdentity('app-a', 'component-a', 'suite-a', 'scenario-a', 'variant-a');
+    }
+
+    private function identityColumns(): array
+    {
+        return [
+            'app_key' => 'app-a',
+            'component_key' => 'component-a',
+            'suite_key' => 'suite-a',
+            'scenario_key' => 'scenario-a',
+            'variant_key' => 'variant-a',
+        ];
+    }
+
+    private function scenario(): AcceptanceScenario
+    {
+        return new class implements AcceptanceScenario
         {
             public function key(): string
             {
-                return 'local-scenario';
+                return 'scenario-a';
             }
 
             public function name(): string
             {
-                return 'Local scenario';
+                return 'Scenario A';
             }
 
             public function metadata(): ScenarioMetadata
             {
                 return new ScenarioMetadata(
-                    suites: ['persistence'],
-                    capabilities: ['run-results'],
-                    tags: ['in-memory'],
-                    disposition: AutomationDisposition::AUTOMATED,
-                    evidenceMode: EvidenceMode::METADATA_ONLY,
+                    ['persistence'],
+                    ['in-memory'],
+                    AutomationDisposition::AUTOMATED,
+                    EvidenceMode::METADATA_ONLY,
                 );
             }
 
@@ -249,23 +258,6 @@ class AcceptanceRunPersistenceTest extends TestCase
                 return [];
             }
         };
-
-        $app = new class($scenario) implements AcceptanceApp
-        {
-            public function __construct(private readonly AcceptanceScenario $scenario) {}
-
-            public function key(): string
-            {
-                return 'local-app';
-            }
-
-            public function scenarios(): iterable
-            {
-                yield $this->scenario;
-            }
-        };
-
-        return [$app, $scenario];
     }
 
     private function profile(): Profile

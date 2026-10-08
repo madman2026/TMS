@@ -1,10 +1,12 @@
 # AI-PACK-TMS-ASYNC-BATCH-ORCHESTRATION-0013 — Async Queue and Bus Batch orchestration
 
-Status: `draft — depends on stages 1–5; normalization and separate operator approval required`
+Status: `draft — stage 7 under Decision 0015; normalize after accepted Core stage 6`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0009–0011, 0013, and 0014; Decision 0014 applied on 2026-10-08 (documentation only).
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering. Normalize this Draft against the single complete hierarchy identity and accepted Core executor contract before approval.
 
 ## 1. Task ID
 

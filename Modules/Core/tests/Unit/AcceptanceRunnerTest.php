@@ -5,11 +5,11 @@ namespace Modules\Core\Tests\Unit;
 use Closure;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\BrowserFactory;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
@@ -36,10 +36,12 @@ class AcceptanceRunnerTest extends TestCase
             $contexts[] = spl_object_id($context);
             yield new StepResult(name: 'second', passed: true);
         });
+        $identity = $this->identity();
 
-        $result = $runner->run($this->app(), $scenario, new RunOptions);
+        $result = $runner->run($identity, $scenario, new RunOptions);
 
         $this->assertTrue($result->passed);
+        $this->assertSame($identity, $result->identity);
         $this->assertSame(['first', 'second'], array_column($result->steps, 'name'));
         $this->assertCount(1, array_unique($contexts));
         $browser->shouldHaveReceived('close')->once();
@@ -61,7 +63,7 @@ class AcceptanceRunnerTest extends TestCase
             yield new StepResult(name: 'must not run', passed: true);
         });
 
-        $result = $runner->run($this->app(), $scenario, new RunOptions);
+        $result = $runner->run($this->identity(), $scenario, new RunOptions);
 
         $this->assertFalse($result->passed);
         $this->assertSame('acceptance_step_failed', $result->errorCode);
@@ -86,7 +88,7 @@ class AcceptanceRunnerTest extends TestCase
             yield new StepResult(name: 'continued', passed: true);
         });
 
-        $result = $runner->run($this->app(), $scenario, new RunOptions);
+        $result = $runner->run($this->identity(), $scenario, new RunOptions);
 
         $this->assertFalse($result->passed);
         $this->assertTrue($laterStepRan);
@@ -103,7 +105,7 @@ class AcceptanceRunnerTest extends TestCase
         });
 
         try {
-            $runner->run($this->app(), $scenario, new RunOptions);
+            $runner->run($this->identity(), $scenario, new RunOptions);
             $this->fail('Expected an AcceptanceExecutionException.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_scenario_failed', $exception->errorCode);
@@ -123,7 +125,7 @@ class AcceptanceRunnerTest extends TestCase
         $runner = new AcceptanceRunner($factory);
 
         try {
-            $runner->run($this->app(), $this->scenario(fn (): array => []), new RunOptions);
+            $runner->run($this->identity(), $this->scenario(fn (): array => []), new RunOptions);
             $this->fail('Expected an AcceptanceExecutionException.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_browser_start_failed', $exception->errorCode);
@@ -226,20 +228,15 @@ class AcceptanceRunnerTest extends TestCase
         return [new AcceptanceRunner($factory), $browser];
     }
 
-    private function app(): AcceptanceApp
+    private function identity(): AcceptanceExecutionIdentity
     {
-        return new class implements AcceptanceApp
-        {
-            public function key(): string
-            {
-                return 'local-app';
-            }
-
-            public function scenarios(): iterable
-            {
-                return [];
-            }
-        };
+        return new AcceptanceExecutionIdentity(
+            'local-app',
+            'local-component',
+            'local-suite',
+            'local-scenario',
+            'local-variant',
+        );
     }
 
     private function scenario(Closure $steps): AcceptanceScenario
@@ -261,7 +258,6 @@ class AcceptanceRunnerTest extends TestCase
             public function metadata(): ScenarioMetadata
             {
                 return new ScenarioMetadata(
-                    suites: ['runner'],
                     capabilities: ['ordered-steps'],
                     tags: ['unit'],
                     disposition: AutomationDisposition::AUTOMATED,

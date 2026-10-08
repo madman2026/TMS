@@ -8,9 +8,15 @@ use Modules\Core\Data\ScenarioMetadata;
 /** Identity/classification only; target behavior and private state stay in App code. */
 final readonly class ScenarioDescriptor
 {
-    public function __construct(public string $key, public ScenarioMetadata $metadata)
-    {
+    public function __construct(
+        public string $key,
+        public string $componentKey,
+        public string $suiteKey,
+        public ScenarioMetadata $metadata,
+    ) {
         self::assertKey($key);
+        self::assertKey($componentKey);
+        self::assertKey($suiteKey);
         self::classification($metadata);
     }
 
@@ -24,12 +30,12 @@ final readonly class ScenarioDescriptor
         return $key;
     }
 
-    /** @return array{suites: list<string>, capabilities: list<string>, tags: list<string>, disposition: string, evidence_mode: string} */
+    /** @return array{capabilities: list<string>, tags: list<string>, disposition: string, evidence_mode: string} */
     public static function classification(ScenarioMetadata $metadata): array
     {
         $result = [];
 
-        foreach (['suites', 'capabilities', 'tags'] as $field) {
+        foreach (['capabilities', 'tags'] as $field) {
             if (count($metadata->$field) > 64) {
                 throw AcceptanceCatalogException::because('acceptance_catalog_invalid');
             }

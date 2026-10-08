@@ -1,6 +1,6 @@
 # TMS-DECISION-0013 — Fifteen-stage layered delivery roadmap
 
-Status: Accepted
+Status: Superseded — retained as accepted history
 Scope: Project roadmap / cross-owner delivery order
 Source: Operator decision
 Date: 2026-10-07
@@ -8,6 +8,8 @@ Review At: completion of each stage
 Blocking: Yes for Pack ordering and ownership
 Closure Condition: superseded by a separately approved roadmap decision
 Next Review At: Pack 0009 normalization
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes this delivery order with a sixteen-stage roadmap whose stage 2 is the atomic hierarchy-cutover remediation. This record remains historical and must not direct Pack execution.
 
 ## Type
 

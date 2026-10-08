@@ -7,7 +7,7 @@ use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
 use App\Exceptions\AcceptanceCatalogException;
 
-/** Bounded streaming selection with canonical output, not global materialization. */
+/** Bounded streaming selection over one explicit hierarchy contract. */
 final class AcceptancePlanner
 {
     public function __construct(private readonly AcceptanceCatalog $catalog) {}
@@ -21,24 +21,35 @@ final class AcceptancePlanner
         $apps = $selector->apps !== [] ? $selector->apps : $registered;
         $versions = [];
         $items = [];
-        $vocabulary = array_fill_keys(['scenarios', 'variants', 'suites', 'capabilities', 'tags'], []);
+        $vocabulary = array_fill_keys([
+            'components', 'suites', 'scenarios', 'variants', 'capabilities', 'tags',
+        ], []);
         $visits = 0;
 
         foreach ($apps as $appKey) {
             $versions[$appKey] = $this->catalog->version($appKey);
+            foreach ($this->catalog->components($appKey) as $component) {
+                AcceptanceCatalog::visit($visits);
+                $vocabulary['components'][$component->key] = true;
+            }
+            foreach ($this->catalog->suites($appKey) as $suite) {
+                AcceptanceCatalog::visit($visits);
+                $vocabulary['suites'][$suite->key] = true;
+            }
             foreach ($this->catalog->descriptors($appKey) as $descriptor) {
                 AcceptanceCatalog::visit($visits);
                 $vocabulary['scenarios'][$descriptor->key] = true;
-                foreach (['suites', 'capabilities', 'tags'] as $field) {
+                foreach (['capabilities', 'tags'] as $field) {
                     foreach ($descriptor->metadata->$field as $key) {
                         $vocabulary[$field][$key] = true;
                     }
                 }
-                if ($selector->scenarios !== [] && ! in_array($descriptor->key, $selector->scenarios, true)) {
+                $scenarioMatches = $selector->scenarios === []
+                    || in_array($descriptor->key, $selector->scenarios, true);
+                if (! $scenarioMatches && $selector->variants === []) {
                     continue;
                 }
-                $matches = $selector->matchesScenario($descriptor);
-                // Explicit variant vocabulary is checked before classification intersection.
+                $matches = $scenarioMatches && $selector->matchesScenario($descriptor);
                 if (! $matches && $selector->variants === []) {
                     continue;
                 }
@@ -51,14 +62,20 @@ final class AcceptancePlanner
                     if (count($items) >= $selector->limit) {
                         throw AcceptanceCatalogException::because('acceptance_catalog_limit_exceeded');
                     }
-                    $items[] = new AcceptancePlanItem($appKey, $descriptor->key, $variant->key, $descriptor->metadata);
+                    $items[] = new AcceptancePlanItem(
+                        $appKey,
+                        $descriptor->componentKey,
+                        $descriptor->suiteKey,
+                        $descriptor->key,
+                        $variant->key,
+                        $descriptor->metadata,
+                    );
                 }
             }
             if ($this->catalog->version($appKey) !== $versions[$appKey]) {
                 throw AcceptanceCatalogException::because('acceptance_catalog_changed');
             }
         }
-        // Recheck earlier Apps after later provider iterations, too.
         foreach ($versions as $appKey => $version) {
             if ($this->catalog->version((string) $appKey) !== $version) {
                 throw AcceptanceCatalogException::because('acceptance_catalog_changed');

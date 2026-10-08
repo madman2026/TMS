@@ -10,7 +10,7 @@ final readonly class OperationRequest
     public function __construct(
         public string $operation,
         array $parameters = [],
-        public int $version = 1,
+        public int $version = 2,
         public ?string $correlationId = null,
     ) {
         $copy = [];

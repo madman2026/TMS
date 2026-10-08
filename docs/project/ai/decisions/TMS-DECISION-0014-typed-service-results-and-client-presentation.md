@@ -9,6 +9,8 @@ Blocking: Yes for service/client contracts in affected Packs
 Closure Condition: superseded by a separately approved service/client contract decision
 Next Review At: `AI-PACK-TMS-OPERATION-SERVICE-LAYER-0009`
 
+Current Architecture Notice (2026-10-08): Decision 0015 retains immutable typed service DTOs and client-owned presentation, but supersedes the legacy list/plan/run projection-preservation clauses. The active client contract is one explicit version-2 hierarchy representation.
+
 ## Type
 
 4. Project-level architecture decision; clarification and extension of Decision 0008.

@@ -19,13 +19,14 @@ final class AcceptanceOperationService
 {
     private const REJECTED_CODES = [
         'operation_not_found', 'operation_request_invalid', 'acceptance_app_not_found',
-        'acceptance_scenario_not_found', 'acceptance_profile_not_found', 'acceptance_selector_invalid',
+        'acceptance_profile_not_found', 'acceptance_selector_invalid',
         'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded', 'acceptance_variant_not_executable',
     ];
 
     private const ADMIN_CODES = [
         'operation_registry_invalid', 'operation_registry_duplicate', 'acceptance_registry_invalid',
-        'acceptance_registry_duplicate', 'acceptance_catalog_invalid', 'acceptance_catalog_duplicate',
+        'acceptance_registry_duplicate', 'acceptance_catalog_invalid',
+        'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
     ];
 
     public function __construct(private readonly AcceptanceOperationRegistry $registry) {}
@@ -38,7 +39,7 @@ final class AcceptanceOperationService
         $operation = $this->registry->has($request->operation) ? $request->operation : null;
         $operationId = $operation === 'acceptance.run' ? (string) Str::uuid() : null;
         $errors = [];
-        if ($request->version !== 1) {
+        if ($request->version !== 2) {
             $errors['version'] = ['operation_request_invalid'];
         }
         if (! $validCorrelation) {
@@ -54,11 +55,13 @@ final class AcceptanceOperationService
         if ($errors !== []) {
             return $this->finish($operation, 'rejected', 'operation_request_invalid', $correlationId, $operationId, errors: $errors);
         }
+        $identityContext = $operation === 'acceptance.run' ? $this->identityContext($request) : [];
 
         try {
             $handler = $this->registry->resolve($operation);
         } catch (Throwable) {
-            return $this->finish($operation, 'failed', 'operation_registry_invalid', $correlationId, $operationId);
+            return $this->finish($operation, 'failed', 'operation_registry_invalid', $correlationId, $operationId,
+                identityContext: $identityContext);
         }
         try {
             $result = $handler->handle($request, $correlationId, $operationId);
@@ -70,7 +73,8 @@ final class AcceptanceOperationService
             if (($result->status === 'succeeded' && $data === null)
                 || ($result->status === 'rejected' && $data !== null)
                 || ($data instanceof CatalogOperationData && $result->status !== 'succeeded')
-                || ($data instanceof RunOperationData && $data->errorCode !== $result->errorCode)) {
+                || ($data instanceof RunOperationData && ($data->errorCode !== $result->errorCode
+                    || ! $this->matchesRequestedIdentity($data, $request)))) {
                 throw new \UnexpectedValueException('operation_result_invalid');
             }
             $status = $data instanceof RunOperationData
@@ -78,17 +82,20 @@ final class AcceptanceOperationService
                 : $result->status;
 
             // Rebuild identity, classification and traces; a handler cannot replace them.
-            return $this->finish($operation, $status, $result->errorCode, $correlationId, $operationId, $data, $result->errors);
+            return $this->finish($operation, $status, $result->errorCode, $correlationId, $operationId,
+                $data, $result->errors, identityContext: $identityContext);
         } catch (AcceptanceCatalogException $exception) {
             return $this->finish($operation, $exception->rejected() ? 'rejected' : 'failed', $exception->errorCode,
-                $correlationId, $operationId, exceptionClass: $exception::class);
+                $correlationId, $operationId, exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (AcceptanceRegistryException $exception) {
             $code = in_array($exception->errorCode, ['acceptance_registry_invalid', 'acceptance_registry_duplicate'], true)
                 ? $exception->errorCode : $this->fallback($operation);
 
-            return $this->finish($operation, 'failed', $code, $correlationId, $operationId, exceptionClass: $exception::class);
+            return $this->finish($operation, 'failed', $code, $correlationId, $operationId,
+                exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (Throwable) {
-            return $this->finish($operation, 'failed', $this->fallback($operation), $correlationId, $operationId);
+            return $this->finish($operation, 'failed', $this->fallback($operation), $correlationId, $operationId,
+                identityContext: $identityContext);
         }
     }
 
@@ -96,9 +103,10 @@ final class AcceptanceOperationService
     private function parameterErrors(OperationRequest $request): array
     {
         $run = $request->operation === 'acceptance.run';
-        $lists = ['app', 'scenario', 'variant', 'suite', 'capability', 'tag', 'disposition', 'evidence_mode'];
+        $lists = ['app', 'component', 'suite', 'scenario', 'variant', 'capability', 'tag', 'disposition', 'evidence_mode'];
         $allowed = $run
-            ? ['app_key', 'scenario_key', 'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms']
+            ? ['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key',
+                'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms']
             : [...$lists, 'limit'];
         $errors = [];
         foreach ($request->parameters as $field => $value) {
@@ -108,7 +116,9 @@ final class AcceptanceOperationService
                 continue;
             }
             $valid = match ($field) {
-                'app_key', 'scenario_key' => is_string($value),
+                'app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key' => is_string($value)
+                    && strlen($value) <= 64
+                    && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1,
                 'profile_id', 'limit' => is_int($value) || is_string($value),
                 'browser' => $value === null || is_string($value),
                 'headed' => is_bool($value),
@@ -121,7 +131,7 @@ final class AcceptanceOperationService
             }
         }
         if ($run) {
-            foreach (['app_key', 'scenario_key', 'profile_id'] as $field) {
+            foreach (['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key', 'profile_id'] as $field) {
                 if (! array_key_exists($field, $request->parameters)) {
                     $errors[$field] = ['operation_request_invalid'];
                 }
@@ -136,6 +146,30 @@ final class AcceptanceOperationService
         return $operation === 'acceptance.run' ? 'acceptance_command_failed' : 'acceptance_catalog_failed';
     }
 
+    private function matchesRequestedIdentity(RunOperationData $data, OperationRequest $request): bool
+    {
+        return $data->appKey === $request->parameters['app_key']
+            && $data->componentKey === $request->parameters['component_key']
+            && $data->suiteKey === $request->parameters['suite_key']
+            && $data->scenarioKey === $request->parameters['scenario_key']
+            && $data->variantKey === $request->parameters['variant_key'];
+    }
+
+    /** Include only fully validated language-neutral identity values in logs. */
+    private function identityContext(OperationRequest $request): array
+    {
+        $context = [];
+        foreach (['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key'] as $field) {
+            $value = $request->parameters[$field];
+            if (strlen($value) > 64 || ! preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value)) {
+                return [];
+            }
+            $context[$field] = $value;
+        }
+
+        return $context;
+    }
+
     private function finish(
         ?string $operation,
         string $status,
@@ -145,6 +179,7 @@ final class AcceptanceOperationService
         CatalogOperationData|RunOperationData|null $data = null,
         array $errors = [],
         ?string $exceptionClass = null,
+        array $identityContext = [],
     ): OperationResult {
         [$retryable, $permanent, $admin] = match (true) {
             $status === 'succeeded' => [null, null, false],
@@ -161,6 +196,7 @@ final class AcceptanceOperationService
             'operation' => $operation, 'error_code' => $code, 'correlation_id' => $correlationId,
             'operation_id' => $operationId, 'retryable' => $retryable, 'permanent' => $permanent,
             'admin_action_required' => $admin,
+            ...$identityContext,
         ];
         if ($data instanceof RunOperationData) {
             $context['test_id'] = $data->testId;

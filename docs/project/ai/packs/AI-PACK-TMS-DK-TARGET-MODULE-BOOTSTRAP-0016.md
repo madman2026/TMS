@@ -1,10 +1,12 @@
 # AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016 — DK target module and owner bootstrap
 
-Status: `draft — depends on stages 1–8; normalization and separate operator approval required`
+Status: `draft — stage 10 under Decision 0015; normalize after accepted Pack 0015`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0007, 0012, and 0013.
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering. The generated DK module must implement only the clean version-2 hierarchy contract; normalize this Draft after stage 9.
 
 ## 1. Task ID
 

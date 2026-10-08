@@ -1,10 +1,12 @@
 # AI-PACK-TMS-ARTISAN-OPERATOR-CLIENT-0015 — Complete Artisan operator client
 
-Status: `draft — depends on stages 1–7; normalization and separate operator approval required`
+Status: `draft — stage 9 under Decision 0015; legacy-projection clauses superseded; regeneration required`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0007–0014; Decision 0014 applied on 2026-10-08 (documentation only).
+
+Current Roadmap Notice (2026-10-08): Decision 0015 requires one version-2 hierarchy client and forbids aliases, retained legacy defaults, or dual projections. Treat every compatibility clause later in this historical Draft as superseded and regenerate the Pack before approval.
 
 ## 1. Task ID
 

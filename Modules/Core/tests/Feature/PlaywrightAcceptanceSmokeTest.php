@@ -3,10 +3,10 @@
 namespace Modules\Core\Tests\Feature;
 
 use App\Contracts\BaseAction;
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
@@ -41,7 +41,6 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
             public function metadata(): ScenarioMetadata
             {
                 return new ScenarioMetadata(
-                    suites: ['browser-smoke'],
                     capabilities: ['interaction', 'viewport'],
                     tags: ['local-content'],
                     disposition: AutomationDisposition::AUTOMATED,
@@ -93,7 +92,7 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         };
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
-        $result = $runner->run($this->app($scenario), $scenario, new RunOptions(
+        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions(
             contextOptions: ['viewport' => ['width' => 800, 'height' => 600]],
         ));
 
@@ -124,7 +123,6 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
             public function metadata(): ScenarioMetadata
             {
                 return new ScenarioMetadata(
-                    suites: ['browser-smoke'],
                     capabilities: ['assertion-failure'],
                     tags: ['local-content'],
                     disposition: AutomationDisposition::AUTOMATED,
@@ -156,7 +154,7 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         };
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
-        $result = $runner->run($this->app($scenario), $scenario, new RunOptions);
+        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions);
 
         $this->assertFalse($result->passed);
         $this->assertSame('acceptance_step_failed', $result->errorCode);
@@ -164,21 +162,14 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         $this->assertTrue($scenario->context?->isClosed());
     }
 
-    private function app(AcceptanceScenario $scenario): AcceptanceApp
+    private function identity(string $scenarioKey): AcceptanceExecutionIdentity
     {
-        return new class($scenario) implements AcceptanceApp
-        {
-            public function __construct(private readonly AcceptanceScenario $scenario) {}
-
-            public function key(): string
-            {
-                return 'local-smoke-app';
-            }
-
-            public function scenarios(): iterable
-            {
-                yield $this->scenario;
-            }
-        };
+        return new AcceptanceExecutionIdentity(
+            'local-smoke-app',
+            'browser',
+            'smoke',
+            $scenarioKey,
+            'chromium',
+        );
     }
 }

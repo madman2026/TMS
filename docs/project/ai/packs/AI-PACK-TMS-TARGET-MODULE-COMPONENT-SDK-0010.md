@@ -1,12 +1,14 @@
 # AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010 — Nwidart target module and Component SDK
 
-Status: `ready — normalized on 2026-10-08; separate operator execution approval required`
+Status: `ready for execution approval — normalized after accepted hierarchy-cutover Remediation 0001`
 
 Generated: `2026-10-07`
 
 Normalized: `2026-10-08`
 
-Decision: Decisions 0007, 0008, 0012, 0013, and 0014.
+Decision: Decisions 0007, 0008, 0012, 0014, and 0015.
+
+Current Execution Notice (2026-10-08): Remediation 0001 is accepted and this unexecuted Pack is normalized against its clean version-2 hierarchy source. Execution still requires its own explicit operator approval; acceptance and commit remain later separate gates.
 
 ## 1. Task ID
 
@@ -14,17 +16,17 @@ Decision: Decisions 0007, 0008, 0012, 0013, and 0014.
 
 ## 2. Task Title
 
-Add the App/Component/Suite/Scenario/Variant hierarchy and reusable target-module creation services.
+Build reusable target-module creation services and a Component SDK on the accepted hierarchy.
 
 ## 3. Goal
 
-Provide client-neutral operations that can create, extend, validate, and safely populate a minimal Nwidart target module while adding explicit Component and Suite identities to the existing code-owned Acceptance catalog.
+Provide client-neutral operations that can create, extend, validate, and safely populate a minimal Nwidart target module using the accepted App/Component/Suite/Scenario/Variant catalog contract.
 
 This Pack creates reusable project infrastructure only. It does not create DK, ND, another production target module, an executable target workflow, or an operator-facing command.
 
 ## 4. Context
 
-Accepted Pack 0009 provides the typed operation boundary and accepted list/plan/run behavior. Decision 0007 changes the executable identity to:
+Accepted Remediation 0001 provides the single version-2 provider, catalog, operation, CLI, persistence, and execution identity. Decision 0015 fixes the executable identity as:
 
 ```text
 App -> Component -> Suite -> Scenario -> Variant -> Step
@@ -36,7 +38,7 @@ The initial Draft also mentioned Component creation and scenario import but list
 
 ## 5. Related Release / Phase
 
-Decision 0013, stage 2.
+Decision 0015, stage 3.
 
 ## 6. Related Epic / Feature / Story
 
@@ -49,17 +51,15 @@ Reusable target onboarding, explicit Component/Suite hierarchy, and source-owned
 - `docs/project/ai/decisions/TMS-DECISION-0012-automated-e2e-coverage-and-traceability.md`
 - `docs/project/ai/decisions/TMS-DECISION-0013-fifteen-stage-layered-delivery-roadmap.md`
 - `docs/project/ai/decisions/TMS-DECISION-0014-typed-service-results-and-client-presentation.md`
+- `docs/project/ai/decisions/TMS-DECISION-0015-clean-acceptance-hierarchy-cutover.md`
+- accepted Remediation 0001 and its Run
 - accepted Pack 0007 and its Run
 - accepted Pack 0009 and its Run
 - installed Nwidart v12.0.5 source named in section 10
 
 ## 8. Files to Create
 
-### Hierarchy and coverage contracts
-
-- `app/Contracts/AcceptanceComponentProvider.php`
-- `app/Data/ComponentDescriptor.php`
-- `app/Data/SuiteDescriptor.php`
+### Coverage contracts
 - `app/Acceptance/Coverage/Enums/CoverageDisposition.php`
 - `app/Acceptance/Coverage/Data/SourceCaseMapping.php`
 
@@ -100,16 +100,6 @@ Reusable target onboarding, explicit Component/Suite hierarchy, and source-owned
 
 ## 9. Files to Edit
 
-### Hierarchy/catalog source
-
-- `app/Data/AcceptancePlan.php`
-- `app/Data/AcceptancePlanItem.php`
-- `app/Data/AcceptanceSelector.php`
-- `app/Data/ScenarioDescriptor.php`
-- `app/Services/AcceptanceAppRegistry.php`
-- `app/Services/AcceptanceCatalog.php`
-- `app/Services/AcceptancePlanner.php`
-
 ### Operation boundary and registration
 
 - `app/Acceptance/Operations/AcceptanceOperationService.php`
@@ -126,7 +116,7 @@ Reusable target onboarding, explicit Component/Suite hierarchy, and source-owned
 - `tests/Unit/AcceptanceOperationRegistryTest.php`
 - `tests/Unit/AcceptanceOperationServiceTest.php`
 - `tests/Feature/AcceptanceCatalogCommandTest.php`
-- `tests/Feature/AcceptanceOperationCommandCompatibilityTest.php`
+- `tests/Feature/AcceptanceOperationCommandContractTest.php`
 - `tests/Feature/AcceptanceRunCommandTest.php`
 
 Governance maintenance directly required by execution may create the eventual Run Report and edit the project Pack/Run indexes under the shared maintenance exception. Normalization itself edits only this Pack and its Pack index row.
@@ -169,7 +159,7 @@ The service must not call `env()`, load `.env`, publish config, write `config/mo
 - `modules_statuses.json`;
 - `composer.json`, `composer.lock`, `vendor/**`, package configuration, or generated autoload files;
 - database workflow definitions, models, migrations, queue/reporting, browser execution, target access, routes, Web/API/MCP, UI/resources, or operator commands;
-- accepted list/plan/run command options, default JSON field order/shape, exit codes, or Prompts behavior;
+- accepted version-2 list/plan/run command options, JSON field order/shape, exit codes, or Prompts behavior;
 - `.env` or any environment file.
 
 ## 13. Clarification Questions Before Implementation
@@ -215,15 +205,14 @@ All new DTOs are immutable and version 1.
 
 `OperationResult` remains the shared status/classification/trace envelope. It accepts the two new operation-data types without JSON or console presentation.
 
-### Hierarchy identity and legacy compatibility
+### Hierarchy identity contract
 
-- New providers implement `AcceptanceComponentProvider`, which extends the existing catalog provider with `components(): iterable<ComponentDescriptor>` and `suites(): iterable<SuiteDescriptor>`.
-- Component, Suite, and Scenario keys are unique within one App. Scenario keys remain App-global in this Pack so the accepted `variants(string $scenarioKey)` and `resolveScenario(string $scenarioKey, string $variantKey)` contracts remain unambiguous.
-- `SuiteDescriptor` carries its `componentKey`; `ScenarioDescriptor` carries `componentKey` and `suiteKey`.
-- Existing providers that do not implement the new contract are normalized temporarily to reserved `component_key=legacy` and `suite_key=legacy`.
-- Existing `ScenarioMetadata::$suites` remains a legacy classification list. Existing `--suite` behavior continues to filter that list. New typed selector dimensions are `component` and `suite_key`; their Artisan options are deferred to Pack 0015.
-- `AcceptancePlanItem` gains typed `componentKey` and `suiteKey`; its canonical fingerprint identity becomes App/Component/Suite/Scenario/Variant.
-- Existing CLI `items` JSON, `plan_version`, option set, exits, and field order remain unchanged in Pack 0010. The new typed properties are not silently added to the accepted legacy projection. Pack 0015 owns a separately normalized versioned client representation.
+- Every generated App implements the existing `AcceptanceComponentProvider` contract directly.
+- Component, Suite, and Scenario keys are App-global. `SuiteDescriptor` references its Component and `ScenarioDescriptor` references its exact Component/Suite.
+- `variants(string $scenarioKey)` describes bounded Variant identity without materializing runtime scenarios.
+- `resolveScenario(componentKey, suiteKey, scenarioKey, variantKey)` resolves only the exact validated tuple.
+- Generated registration, managed regions, validation, mapping import, and scenario skeletons use the complete App/Component/Suite/Scenario/Variant identity.
+- The accepted version-2 list/plan/run selectors, plan fingerprint, JSON projection, and required run signature remain unchanged by this Pack.
 
 ### Source mapping interchange
 
@@ -254,7 +243,7 @@ Rules:
 - excluded dispositions require a reason and non-empty uncovered assertions and must not carry an executable tuple;
 - only `automated_full` and `automated_partial` may produce scenario skeletons;
 - generated scenario skeletons use the existing non-executable `not-implemented` metadata state and contain no workflow steps, target selector, request, account, URL, credential, or payload;
-- there is no `manual-only` coverage disposition and import must reject any unrecognized disposition before filesystem mutation.
+- mapping dispositions are limited to the five values defined by Decision 0012; import rejects every other value before filesystem mutation.
 
 ## 14. Multilingual / Translation Requirements
 
@@ -318,7 +307,7 @@ Native Nwidart JSON, Composer, config, and seeder stubs are rendered where their
 - Reject duplicate Component, Suite, Scenario, and Variant keys deterministically.
 - Reject Suites referencing an unknown Component and Scenarios referencing an unknown or mismatched Component/Suite.
 - Preserve bounded iteration and accepted lazy-resolution/side-effect protections.
-- Preserve legacy providers through the temporary reserved hierarchy and keep their current execution resolution behavior.
+- Require every generated provider to satisfy the complete hierarchy contract; no fallback provider or synthetic hierarchy identity is generated.
 
 ## 18. Architecture Constraints
 
@@ -338,7 +327,7 @@ Services and DTOs must be callable without Artisan, Symfony console, Prompts, te
 - the Acceptance App has the approved app key and implements the required catalog/component contracts;
 - managed-region markers are present and balanced;
 - Component/Suite/Scenario references and class-name derivations are unique;
-- mapping entries satisfy Decision 0012 and never create an executable `manual-only` scenario;
+- mapping entries satisfy Decision 0012 and create executable identity only for automated dispositions;
 - no route/resource/controller/model/migration or other prohibited generated surface appears in the created skeleton.
 
 Validation does not boot the generated provider, execute a scenario, enable a module, modify a file, or claim target readiness.
@@ -347,7 +336,7 @@ Validation does not boot the generated provider, execute a scenario, enable a mo
 
 - Module names must be canonical Studly identifiers matching `^[A-Z][A-Za-z0-9]{0,63}$`.
 - App/Component/Suite/Scenario/Variant/assertion keys use the existing language-neutral key rule and maximum length; source-case IDs use a separately bounded `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` rule.
-- Reject separators, dot segments, drive/UNC prefixes, NUL/control characters, reserved `legacy` use by new hierarchy input, namespace syntax, and ambiguous class-name collisions.
+- Reject separators, dot segments, drive/UNC prefixes, NUL/control characters, namespace syntax, and ambiguous class-name collisions.
 - Resolve and compare normalized absolute module-root/staging/final paths before every write or cleanup. On Windows, compare case-insensitively and require the final path to remain a direct child of the injected module root.
 - Stubs receive only validated/derived replacements. Never place raw exceptions, paths outside the module root, credentials, accounts, URLs, selectors, payloads, environment values, or arbitrary PHP/class text into source or results.
 - Tests use only obvious synthetic sentinels and a unique temporary module root. No real target, module activation, root Composer change, environment file, or network call is allowed.
@@ -388,7 +377,7 @@ A completed validation operation returns `succeeded` with `TargetModuleValidatio
 
 No database model, migration, table, column, foreign key, relationship, backfill, persisted snapshot, or data rollback change.
 
-Descriptor/request/result DTO shapes change in source only. Legacy provider normalization is temporary and explicit. Coverage mappings remain target-owned source code; this Pack adds their generic immutable contract and generation convention only.
+Descriptor/request/result DTO additions remain source-only. Coverage mappings remain target-owned source code; this Pack adds their generic immutable contract and generation convention only.
 
 ## 23. Commenting Requirements
 
@@ -396,7 +385,7 @@ Follow `docs/ai/rules/COMMENTING-RULES.md`. Explain only:
 
 - why the adapter uses lower-level Nwidart services instead of command-coupled `ModuleGenerator`;
 - the generated versus TMS-managed-region ownership boundary;
-- App-global hierarchy-key uniqueness and temporary `legacy` normalization;
+- App-global hierarchy-key uniqueness and exact tuple ownership;
 - why imported scenario skeletons remain non-executable.
 
 Do not add broad comments, copied Pack text, or unrelated annotation cleanup.
@@ -407,15 +396,15 @@ Do not add broad comments, copied Pack text, or unrelated annotation cleanup.
 - Cleanup resolves and verifies the exact temporary root before recursive removal and runs in `finally`/teardown.
 - Creation tests compare dry-run and write plans, exact relative trees/content, no-overwrite/idempotent managed reconciliation, native-stub output, rollback after injected failure, traversal/class collision rejection, and absence of console/process/activator calls.
 - Validator tests cover every stable issue code, valid minimal layout, malformed JSON/provider/Composer/marker content, registration missing, forbidden surface, and read-only behavior.
-- Hierarchy tests cover legacy normalization, Component/Suite references, App-global duplicates, deterministic filters/order/fingerprint identity, accepted legacy CLI projection, and no executable-provider resolution during inspection.
-- Mapping tests cover all five Decision 0012 dispositions, field requirements, duplicates, replacement links, no `manual-only`, and no scenario generation for merged/excluded entries.
+- Hierarchy tests cover generated-provider conformance, Component/Suite references, App-global duplicates, deterministic filters/order/fingerprint identity, accepted version-2 CLI projection, and no executable-provider resolution during inspection.
+- Mapping tests cover all five Decision 0012 dispositions, field requirements, duplicates, replacement links, and no scenario generation for merged/excluded entries.
 - Operation tests call the shared service directly and assert DTO properties, request validation, operation IDs, classification, exact logs, dry-run/no side effects, safe fallback, and sentinel omission without parsing console output.
-- Regression tests preserve accepted list/plan/run JSON/options/exits and existing Pack 0009 isolation/side-effect guarantees.
+- Regression tests preserve accepted version-2 list/plan/run JSON/options/exits and existing isolation/side-effect guarantees.
 
 ## 25. Acceptance Checklist
 
-- [ ] explicit Component and Suite keys exist in descriptors, selectors, plan items, canonical identity, and typed service data;
-- [ ] legacy providers normalize to the reserved hierarchy without changing accepted CLI JSON/options/exits;
+- [ ] generated providers use the existing explicit Component and Suite descriptors and complete canonical identity;
+- [ ] generated providers expose one complete hierarchy contract without adapters, fallback identities, or alternate client projections;
 - [ ] all four new operations use immutable semantic DTOs and remain callable without Artisan;
 - [ ] lower-level Nwidart repository/Stub/FileGenerator APIs are reused and command/process/activator boundaries are absent;
 - [ ] dry-run is default, deterministic, and side-effect free;
@@ -431,7 +420,7 @@ Do not add broad comments, copied Pack text, or unrelated annotation cleanup.
 |---|---|
 | `tests/Unit/TargetModuleCreatorTest.php` | Laravel/Nwidart boundary, exact layout, dry-run, staging/rollback, managed reconciliation, collision/path safety, no console/process/activation |
 | `tests/Unit/TargetModuleValidatorTest.php` | valid structure and every stable validation issue without mutation |
-| `tests/Unit/AcceptanceHierarchyTest.php` | typed hierarchy, legacy defaults, unique/referential integrity, deterministic selection and canonical identity |
+| `tests/Unit/AcceptanceHierarchyTest.php` | generated-provider conformance, unique/referential integrity, deterministic selection and canonical identity |
 | `tests/Unit/SourceCaseMappingTest.php` | five dispositions, required fields, links, duplicates and non-executable import policy |
 | `tests/Feature/TargetModuleOperationServiceTest.php` | four registered operations, typed results, classifications/logs/traces, dry-run/write in temp root and sensitive sentinel omission |
 
@@ -446,7 +435,7 @@ Run these exact test groups through the accepted Pack 0009 absent-dotenv Laravel
 ```text
 test --compact tests/Unit/TargetModuleCreatorTest.php tests/Unit/TargetModuleValidatorTest.php tests/Unit/AcceptanceHierarchyTest.php tests/Unit/SourceCaseMappingTest.php
 test --compact tests/Feature/TargetModuleOperationServiceTest.php tests/Unit/AcceptanceAppRegistryTest.php tests/Unit/AcceptanceCatalogTest.php tests/Unit/AcceptancePlannerTest.php tests/Unit/AcceptanceVariantDispatcherTest.php tests/Unit/AcceptanceOperationRegistryTest.php tests/Unit/AcceptanceOperationServiceTest.php
-test --compact tests/Feature/AcceptanceOperationCommandCompatibilityTest.php tests/Feature/AcceptanceCatalogCommandTest.php tests/Feature/AcceptanceRunCommandTest.php
+test --compact tests/Feature/AcceptanceOperationCommandContractTest.php tests/Feature/AcceptanceCatalogCommandTest.php tests/Feature/AcceptanceRunCommandTest.php
 list --format=json
 ```
 
@@ -482,7 +471,7 @@ No target module, owner activation, complete Artisan client, executable target w
 
 ### Before AI Execution
 
-- Approve the normalized App-global key uniqueness and temporary `legacy` Component/Suite defaults.
+- Approve generated-provider conformance to the accepted App-global key uniqueness and complete tuple contract.
 - Approve the exact generated layout, disabled-by-default activation boundary, four operation names, typed DTO/mapping fields, validation/error codes, and managed-region policy.
 - Approve dry-run by default, no force/overwrite option, sibling staging plus bounded cleanup, and temp-root-only write tests.
 - Approve adding the exact new operation-boundary files and regression-test edits in sections 8–9.
@@ -494,7 +483,7 @@ No target module, owner activation, complete Artisan client, executable target w
 - Compare one target dry-run plan with one temporary generated tree and validator result.
 - Inspect one Component creation and one mixed mapping import containing full, partial, merged, and excluded dispositions.
 - Confirm imported skeletons are non-executable and excluded/merged mappings create no scenario file.
-- Confirm legacy list/plan/run JSON/options/exits remain accepted and no persistent module/status/autoload file changed.
+- Confirm version-2 list/plan/run JSON/options/exits remain unchanged and no persistent module/status/autoload file changed.
 
 ## 30. Agent Final Report
 
@@ -502,7 +491,7 @@ Follow `docs/ai/rules/REPORTING-RULES.md`. Report:
 
 - Nwidart APIs reused and command-coupled APIs intentionally excluded;
 - exact generated paths and managed-region/collision behavior;
-- hierarchy/legacy compatibility and CLI preservation;
+- generated hierarchy conformance and version-2 CLI preservation;
 - mapping/import behavior and non-executable skeleton evidence;
 - new operations, DTOs, codes, classification, logs, trace IDs, and sensitive-output checks;
 - commands/tests actually run, failures/fixes, temp cleanup, limitations, and unchanged protected paths;
@@ -512,7 +501,7 @@ Do not create an accepted Run, claim implementation, or claim target readiness b
 
 ## 31. Review Checklist
 
-Review Nwidart coupling, typed/client-neutral results, path containment, staging cleanup, no-overwrite/idempotency, managed markers, generated layout, disabled activation, hierarchy uniqueness/references, legacy compatibility, source mapping invariants, non-executable skeletons, operation classification/log safety, regression evidence, scope, and protected paths.
+Review Nwidart coupling, typed/client-neutral results, path containment, staging cleanup, no-overwrite/idempotency, managed markers, generated layout, disabled activation, hierarchy uniqueness/references, generated-provider conformance, source mapping invariants, non-executable skeletons, operation classification/log safety, regression evidence, scope, and protected paths.
 
 ## 32. Rollback / Safety Notes
 
@@ -544,4 +533,4 @@ No commit is authorized by this Pack.
 
 No unresolved design question remains inside the normalized contract.
 
-Execution is blocked only on the explicit operator approval in section 29. Pack 0015 still owns command names/signatures, Persian presentation, JSON/file parsing into `SourceCaseMapping`, versioned hierarchy output, help, exits, and operator documentation. Pack 0016 owns actual DK module creation, activation/status entry, owner documentation, and target-specific registration review. Target owners own real mappings and executable scenarios.
+Remediation 0001 is accepted and the Pack now consumes only the clean version-2 hierarchy contract. Pack 0010 execution requires separate explicit approval. Pack 0015 owns the complete interactive operator client; Pack 0016 owns actual DK module creation, activation/status entry, owner documentation, and target-specific registration review. Target owners own real mappings and executable scenarios.

@@ -1,10 +1,12 @@
 # AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014 — Query, reporting, evidence, and traceability
 
-Status: `draft — depends on Pack 0013; normalization and separate operator approval required`
+Status: `draft — stage 8 under Decision 0015; normalize after accepted Pack 0013`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0008, 0010, 0012, 0013, and 0014; Decision 0014 applied on 2026-10-08 (documentation only).
+
+Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering and requires all reports to use the complete hierarchy tuple without legacy projections. Normalize before approval.
 
 ## 1. Task ID
 

@@ -2,265 +2,285 @@
 
 namespace Tests\Unit;
 
-use App\Contracts\AcceptanceCatalogProvider;
-use App\Data\AcceptanceSelector;
+use App\Contracts\AcceptanceComponentProvider;
+use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
+use App\Data\SuiteDescriptor;
 use App\Data\VariantDescriptor;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceCatalog;
 use App\Services\AcceptancePlanner;
 use App\Services\AcceptanceVariantDispatcher;
-use Modules\Core\Contracts\AcceptanceApp;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use stdClass;
 
 class AcceptanceVariantDispatcherTest extends TestCase
 {
-    public function test_only_the_selected_factory_is_called_and_steps_are_never_executed(): void
+    public function test_it_resolves_only_the_exact_validated_tuple(): void
     {
-        $scenario = $this->scenario('scenario-a');
-        $selected = $this->provider('app-a', ['default', 'other'], $scenario);
-        $unselected = $this->provider('app-b', ['default'], $this->scenario('scenario-a'));
-        [$registry, $dispatcher] = $this->dispatcher([$selected, $unselected]);
-        $resolved = $dispatcher->resolve('app-a', 'scenario-a', 'other');
-        $this->assertSame($scenario, $resolved);
-        $this->assertSame([['scenario-a', 'other']], $selected->resolutions);
-        $this->assertSame([], $unselected->resolutions);
-        $this->assertSame(0, $unselected->descriptions);
-        $this->assertSame(0, $scenario->stepsCalls);
-        $this->assertSame(0, $selected->legacyCalls);
+        [$dispatcher, $provider, $scenario] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $identity = $this->identity();
 
-        $this->assertSame($scenario, $registry->scenario('app-a', 'scenario-a'));
-        $this->assertSame(['scenario-a', 'default'], $selected->resolutions[1]);
-        $this->assertNull($registry->scenario('app-a', 'missing'));
+        $this->assertSame($scenario, $dispatcher->resolve($identity));
+        $this->assertSame([
+            ['component-a', 'suite-a', 'scenario-a', 'variant-a'],
+        ], $provider->resolutions);
+        $this->assertSame(0, $scenario->stepCalls);
     }
 
-    public function test_excluded_dispositions_unknown_identity_and_missing_default_never_call_a_factory(): void
+    public function test_non_executable_variant_is_rejected_before_runtime_resolution(): void
     {
-        foreach ([
-            AutomationDisposition::MANUAL_ONLY,
-            AutomationDisposition::BLOCKED,
-            AutomationDisposition::NOT_IMPLEMENTED,
-        ] as $disposition) {
-            $app = $this->provider('app-a', ['default'], $this->scenario('scenario-a'), $disposition);
-            [, $dispatcher] = $this->dispatcher([$app]);
-            $this->assertError('acceptance_variant_not_executable', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-            $this->assertSame([], $app->resolutions);
-        }
-        $app = $this->provider('app-a', ['other'], $this->scenario('scenario-a'));
-        [$registry, $dispatcher] = $this->dispatcher([$app]);
-        $this->assertError('acceptance_selector_not_found', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-        $this->assertError('acceptance_selector_not_found', fn () => $dispatcher->resolve('app-a', 'missing', 'other'));
-        $this->assertError('acceptance_app_not_found', fn () => $dispatcher->resolve('missing', 'scenario-a'));
-        $this->assertError('acceptance_selector_invalid', fn () => $dispatcher->resolve('app-a', 'scenario-a', 'example-token-sentinel/invalid'));
-        $this->assertNull($registry->scenario('app-a', 'scenario-a'));
-        $this->assertSame([], $app->resolutions);
-    }
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::BLOCKED);
 
-    public function test_factory_null_key_and_metadata_mismatch_are_normalized_without_execution(): void
-    {
-        foreach ([
-            null, $this->scenario('wrong-key'), $this->scenario('scenario-a', AutomationDisposition::BLOCKED),
-        ] as $resolved) {
-            $app = $this->provider('app-a', ['default'], $resolved);
-            [, $dispatcher] = $this->dispatcher([$app]);
-            $this->assertError('acceptance_catalog_invalid', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-            $this->assertCount(1, $app->resolutions);
-            if ($resolved !== null) {
-                $this->assertSame(0, $resolved->stepsCalls);
-            }
-        }
-    }
-
-    public function test_factory_failure_and_version_drift_are_safe_and_leave_steps_unexecuted(): void
-    {
-        $scenario = $this->scenario('scenario-a');
-        $app = $this->provider('app-a', ['default'], $scenario);
-        $app->failure = true;
-        [, $dispatcher] = $this->dispatcher([$app]);
-        $this->assertError('acceptance_catalog_failed', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-        $app->failure = false;
-        $app->changeVersion = true;
-        $this->assertError('acceptance_catalog_changed', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-        $this->assertSame(0, $scenario->stepsCalls);
-    }
-
-    public function test_a_factory_return_type_violation_is_a_safe_invalid_catalog_failure(): void
-    {
-        $app = $this->provider('app-a', ['default'], $this->scenario('scenario-a'));
-        $app->wrongType = true;
-        [, $dispatcher] = $this->dispatcher([$app]);
-        $this->assertError('acceptance_catalog_invalid', fn () => $dispatcher->resolve('app-a', 'scenario-a'));
-        $this->assertCount(1, $app->resolutions);
-    }
-
-    public function test_legacy_default_variant_resolves_the_exact_cached_scenario_and_plan_does_not_run_steps(): void
-    {
-        $scenario = $this->scenario('scenario-a');
-        $app = new class($scenario) implements AcceptanceApp
-        {
-            public int $enumerations = 0;
-
-            public function __construct(private AcceptanceScenario $scenario) {}
-
-            public function key(): string
-            {
-                return 'legacy-app';
-            }
-
-            public function scenarios(): iterable
-            {
-                $this->enumerations++;
-                yield $this->scenario;
-            }
-        };
-        [$registry, $dispatcher] = $this->dispatcher([$app]);
-        $this->assertSame(0, $app->enumerations);
-        $plan = (new AcceptancePlanner(new AcceptanceCatalog($registry)))->plan(new AcceptanceSelector);
-        $this->assertSame(['default'], array_column($plan->toArray()['items'], 'variant_key'));
-        $this->assertSame(['legacy-app' => 'legacy-v1'], $plan->catalogVersions);
-        $this->assertSame($scenario, $dispatcher->resolve('legacy-app', 'scenario-a'));
-        $this->assertSame(1, $app->enumerations);
-        $this->assertSame(0, $scenario->stepsCalls);
-    }
-
-    public function test_shared_scenario_variant_keys_across_apps_are_distinct_tuples(): void
-    {
-        [$registry] = $this->dispatcher([
-            $this->provider('app-a', ['default'], $this->scenario('scenario-a')),
-            $this->provider('app-b', ['default'], $this->scenario('scenario-a')),
-        ]);
-        $plan = (new AcceptancePlanner(new AcceptanceCatalog($registry)))->plan(new AcceptanceSelector);
-        $this->assertSame(['app-a', 'app-b'], array_column($plan->toArray()['items'], 'app_key'));
-        $this->assertSame(['scenario-a', 'scenario-a'], array_column($plan->toArray()['items'], 'scenario_key'));
-    }
-
-    private function assertError(string $code, callable $action): void
-    {
         try {
-            $action();
-            $this->fail('Expected a safe dispatch rejection/failure.');
+            $dispatcher->resolve($this->identity());
+            $this->fail('Expected blocked variant to be rejected.');
         } catch (AcceptanceCatalogException $exception) {
-            $this->assertSame($code, $exception->errorCode);
+            $this->assertSame('acceptance_variant_not_executable', $exception->errorCode);
+        }
+
+        $this->assertSame([], $provider->resolutions);
+    }
+
+    public function test_null_key_and_metadata_mismatches_are_safe_invalid_catalog_failures(): void
+    {
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->resolvedScenario = null;
+        $this->assertDispatchError('acceptance_catalog_invalid', fn () => $dispatcher->resolve($this->identity()));
+
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->resolvedScenario = $this->scenario('wrong-key', $this->metadata(AutomationDisposition::AUTOMATED));
+        $this->assertDispatchError('acceptance_catalog_invalid', fn () => $dispatcher->resolve($this->identity()));
+
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->resolvedScenario = $this->scenario('scenario-a', $this->metadata(AutomationDisposition::AUTOMATED, ['different']));
+        $this->assertDispatchError('acceptance_catalog_invalid', fn () => $dispatcher->resolve($this->identity()));
+
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->resolvedScenario = new stdClass;
+        $this->assertDispatchError('acceptance_catalog_invalid', fn () => $dispatcher->resolve($this->identity()));
+    }
+
+    public function test_resolution_failure_is_normalized_without_raw_text_or_step_execution(): void
+    {
+        [$dispatcher, $provider, $scenario] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->failResolution = true;
+
+        try {
+            $dispatcher->resolve($this->identity());
+            $this->fail('Expected safe provider failure.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_catalog_failed', $exception->errorCode);
+            $this->assertStringNotContainsString('example-sensitive-value', $exception->getMessage());
             $this->assertNull($exception->getPrevious());
-            $this->assertStringNotContainsString('example-token-sentinel', $exception->getMessage());
+            $this->assertSame(0, $scenario->stepCalls);
         }
     }
 
-    private function dispatcher(array $apps): array
+    public function test_version_drift_after_planning_is_rejected(): void
     {
+        [$dispatcher, $provider, $scenario] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->changeVersionAfter = 3;
+
+        $this->assertDispatchError('acceptance_catalog_changed', fn () => $dispatcher->resolve($this->identity()));
+        $this->assertSame(0, $scenario->stepCalls);
+    }
+
+    public function test_missing_explicit_variant_is_rejected_without_inference(): void
+    {
+        [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $identity = new AcceptanceExecutionIdentity('app-a', 'component-a', 'suite-a', 'scenario-a', 'missing');
+
+        try {
+            $dispatcher->resolve($identity);
+            $this->fail('Expected missing variant to be rejected.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame('acceptance_selector_not_found', $exception->errorCode);
+        }
+
+        $this->assertSame([], $provider->resolutions);
+    }
+
+    public function test_shared_hierarchy_keys_across_apps_resolve_only_the_selected_provider(): void
+    {
+        $metadata = $this->metadata(AutomationDisposition::AUTOMATED);
+        $scenarioA = $this->scenario('scenario-a', $metadata);
+        $scenarioB = $this->scenario('scenario-a', $metadata);
+        $providerA = $this->provider('app-a', $metadata, $scenarioA);
+        $providerB = $this->provider('app-b', $metadata, $scenarioB);
         $registry = new AcceptanceAppRegistry;
-        foreach ($apps as $app) {
-            $registry->register($app);
-        }
+        $registry->register($providerB);
+        $registry->register($providerA);
+        $dispatcher = new AcceptanceVariantDispatcher(
+            new AcceptancePlanner(new AcceptanceCatalog($registry)),
+            $registry,
+        );
 
-        return [$registry, new AcceptanceVariantDispatcher(new AcceptancePlanner(new AcceptanceCatalog($registry)), $registry)];
+        $this->assertSame($scenarioA, $dispatcher->resolve($this->identity('app-a')));
+        $this->assertSame($scenarioB, $dispatcher->resolve($this->identity('app-b')));
+        $this->assertSame([
+            ['component-a', 'suite-a', 'scenario-a', 'variant-a'],
+        ], $providerA->resolutions);
+        $this->assertSame([
+            ['component-a', 'suite-a', 'scenario-a', 'variant-a'],
+        ], $providerB->resolutions);
+        $this->assertSame(0, $scenarioA->stepCalls);
+        $this->assertSame(0, $scenarioB->stepCalls);
     }
 
-    private function scenario(string $key, AutomationDisposition $disposition = AutomationDisposition::AUTOMATED): AcceptanceScenario
+    /** @return array{AcceptanceVariantDispatcher, AcceptanceComponentProvider, AcceptanceScenario} */
+    private function dispatcher(AutomationDisposition $disposition): array
     {
-        return new class($key, $disposition) implements AcceptanceScenario
-        {
-            public int $stepsCalls = 0;
+        $metadata = $this->metadata($disposition);
+        $scenario = $this->scenario('scenario-a', $metadata);
+        $provider = $this->provider('app-a', $metadata, $scenario);
+        $registry = new AcceptanceAppRegistry;
+        $registry->register($provider);
+        $dispatcher = new AcceptanceVariantDispatcher(
+            new AcceptancePlanner(new AcceptanceCatalog($registry)),
+            $registry,
+        );
 
-            public function __construct(private string $key, private AutomationDisposition $disposition) {}
-
-            public function key(): string
-            {
-                return $this->key;
-            }
-
-            public function name(): string
-            {
-                return 'example-token-sentinel';
-            }
-
-            public function metadata(): ScenarioMetadata
-            {
-                return new ScenarioMetadata(['suite'], ['cap'], ['tag'], $this->disposition, EvidenceMode::METADATA_ONLY);
-            }
-
-            public function steps(TestContext $context): iterable
-            {
-                $this->stepsCalls++;
-                throw new RuntimeException('Dispatch must not execute steps.');
-            }
-        };
+        return [$dispatcher, $provider, $scenario];
     }
 
-    private function provider(string $key, array $variants, ?AcceptanceScenario $resolved, AutomationDisposition $disposition = AutomationDisposition::AUTOMATED): AcceptanceCatalogProvider
-    {
-        return new class($key, $variants, $resolved, $disposition) implements AcceptanceCatalogProvider
+    private function provider(
+        string $appKey,
+        ScenarioMetadata $metadata,
+        AcceptanceScenario $scenario,
+    ): AcceptanceComponentProvider {
+        return new class($appKey, $metadata, $scenario) implements AcceptanceComponentProvider
         {
             public array $resolutions = [];
 
-            public int $descriptions = 0;
+            public mixed $resolvedScenario;
 
-            public int $legacyCalls = 0;
+            public bool $failResolution = false;
 
-            public bool $failure = false;
+            public int $versionCalls = 0;
 
-            public bool $wrongType = false;
+            public ?int $changeVersionAfter = null;
 
-            public bool $changeVersion = false;
-
-            public string $revision = 'v1';
-
-            public function __construct(private string $key, private array $variants, private ?AcceptanceScenario $resolved, private AutomationDisposition $disposition) {}
+            public function __construct(
+                private readonly string $appKey,
+                private readonly ScenarioMetadata $scenarioMetadata,
+                AcceptanceScenario $scenario,
+            ) {
+                $this->resolvedScenario = $scenario;
+            }
 
             public function key(): string
             {
-                return $this->key;
+                return $this->appKey;
             }
 
             public function catalogVersion(): string
             {
-                return $this->revision;
+                $this->versionCalls++;
+
+                return $this->changeVersionAfter !== null && $this->versionCalls > $this->changeVersionAfter
+                    ? 'changed'
+                    : 'v2';
             }
 
-            public function descriptors(): iterable
+            public function components(): iterable
             {
-                $this->descriptions++;
-                yield new ScenarioDescriptor('scenario-a', new ScenarioMetadata(
-                    ['suite'], ['cap'], ['tag'], $this->disposition, EvidenceMode::METADATA_ONLY,
-                ));
+                yield new ComponentDescriptor('component-a');
             }
 
-            public function variants(string $scenarioKey): iterable
+            public function suites(): iterable
             {
-                foreach ($this->variants as $key) {
-                    yield new VariantDescriptor($key);
-                }
-            }
-
-            public function resolveScenario(string $scenarioKey, string $variantKey): ?AcceptanceScenario
-            {
-                $this->resolutions[] = [$scenarioKey, $variantKey];
-                if ($this->wrongType) {
-                    return new stdClass;
-                }
-                if ($this->failure) {
-                    throw new RuntimeException('example-token-sentinel');
-                }
-                if ($this->changeVersion) {
-                    $this->revision = 'v2';
-                }
-
-                return $this->resolved;
+                yield new SuiteDescriptor('suite-a', 'component-a');
             }
 
             public function scenarios(): iterable
             {
-                $this->legacyCalls++;
-                throw new RuntimeException('The catalog-aware legacy path must not be used.');
+                yield new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $this->scenarioMetadata);
+            }
+
+            public function variants(string $scenarioKey): iterable
+            {
+                yield new VariantDescriptor('variant-a');
+            }
+
+            public function resolveScenario(
+                string $componentKey,
+                string $suiteKey,
+                string $scenarioKey,
+                string $variantKey,
+            ): ?AcceptanceScenario {
+                $this->resolutions[] = [$componentKey, $suiteKey, $scenarioKey, $variantKey];
+                if ($this->failResolution) {
+                    throw new \RuntimeException('example-sensitive-value');
+                }
+
+                return $this->resolvedScenario;
             }
         };
+    }
+
+    private function identity(string $appKey = 'app-a'): AcceptanceExecutionIdentity
+    {
+        return new AcceptanceExecutionIdentity($appKey, 'component-a', 'suite-a', 'scenario-a', 'variant-a');
+    }
+
+    private function metadata(
+        AutomationDisposition $disposition,
+        array $capabilities = ['capability-a'],
+    ): ScenarioMetadata {
+        return new ScenarioMetadata($capabilities, ['tag-a'], $disposition, EvidenceMode::METADATA_ONLY);
+    }
+
+    private function scenario(string $key, ScenarioMetadata $metadata): AcceptanceScenario
+    {
+        return new class($key, $metadata) implements AcceptanceScenario
+        {
+            public int $stepCalls = 0;
+
+            public function __construct(
+                private readonly string $scenarioKey,
+                private readonly ScenarioMetadata $scenarioMetadata,
+            ) {}
+
+            public function key(): string
+            {
+                return $this->scenarioKey;
+            }
+
+            public function name(): string
+            {
+                return 'Scenario A';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return $this->scenarioMetadata;
+            }
+
+            public function steps(TestContext $context): iterable
+            {
+                $this->stepCalls++;
+
+                return [];
+            }
+        };
+    }
+
+    private function assertDispatchError(string $code, callable $callback): void
+    {
+        try {
+            $callback();
+            $this->fail('Expected dispatch failure.');
+        } catch (AcceptanceCatalogException $exception) {
+            $this->assertSame($code, $exception->errorCode);
+            $this->assertNull($exception->getPrevious());
+        }
     }
 }

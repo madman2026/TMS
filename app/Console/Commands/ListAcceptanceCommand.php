@@ -17,13 +17,17 @@ class ListAcceptanceCommand extends Command
     public function handle(AcceptanceOperationService $service): int
     {
         $parameters = [];
-        foreach (['app', 'scenario', 'variant', 'suite', 'capability', 'tag', 'disposition', 'limit'] as $option) {
+        foreach (['app', 'component', 'suite', 'scenario', 'variant', 'capability', 'tag', 'disposition', 'limit'] as $option) {
             $parameters[$option] = $this->option($option);
         }
         $parameters['evidence_mode'] = $this->option('evidence-mode');
         $result = $service->execute(new OperationRequest($this->planning() ? 'acceptance.plan' : 'acceptance.list', $parameters));
         if ($result->status !== 'succeeded') {
-            $this->line(json_encode(['status' => $result->status, 'error_code' => $result->errorCode], JSON_THROW_ON_ERROR));
+            $this->line(json_encode([
+                'schema_version' => 2,
+                'status' => $result->status,
+                'error_code' => $result->errorCode,
+            ], JSON_THROW_ON_ERROR));
 
             return $result->status === 'rejected' ? self::INVALID : self::FAILURE;
         }
@@ -31,6 +35,7 @@ class ListAcceptanceCommand extends Command
         $data = $result->data;
         // The accepted JSON map and field-order conventions belong only to this client.
         $this->line(json_encode([
+            'schema_version' => 2,
             'status' => $this->planning() ? 'planned' : 'listed',
             'plan_version' => $data->planVersion,
             'catalog_versions' => (object) $data->catalogVersions,
