@@ -1,0 +1,49 @@
+<?php
+
+namespace $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance\Components\$COMPONENT_CLASS$;
+
+use App\Data\ScenarioDescriptor;
+use App\Data\SuiteDescriptor;
+use App\Data\VariantDescriptor;
+use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Data\ScenarioMetadata;
+use Modules\Core\Enums\AutomationDisposition;
+use Modules\Core\Enums\EvidenceMode;
+
+final class $COMPONENT_CLASS$AcceptanceComponent
+{
+    public function suites(): iterable
+    {
+        // <tms:suites>
+        // </tms:suites>
+    }
+
+    public function scenarios(): iterable
+    {
+        // <tms:scenarios>
+        // </tms:scenarios>
+    }
+
+    public function variants(string $scenarioKey): iterable
+    {
+        // <tms:variants>
+        // </tms:variants>
+    }
+
+    public function resolveScenario(
+        string $suiteKey,
+        string $scenarioKey,
+        string $variantKey,
+    ): ?AcceptanceScenario {
+        // <tms:resolutions>
+        // </tms:resolutions>
+
+        return null;
+    }
+
+    private function metadata(): ScenarioMetadata
+    {
+        // Imported skeletons remain non-executable until an owner-local Pack adds behavior.
+        return new ScenarioMetadata([], [], AutomationDisposition::NOT_IMPLEMENTED, EvidenceMode::METADATA_ONLY);
+    }
+}

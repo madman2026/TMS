@@ -2,10 +2,14 @@
 
 namespace App\Acceptance\Operations;
 
+use App\Acceptance\Coverage\Data\SourceCaseMapping;
+use App\Acceptance\Modules\TargetModuleException;
 use App\Acceptance\Operations\Data\CatalogOperationData;
+use App\Acceptance\Operations\Data\ModuleChangeData;
 use App\Acceptance\Operations\Data\OperationRequest;
 use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
+use App\Acceptance\Operations\Data\TargetModuleValidationData;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
 use App\TestStatusEnum;
@@ -21,12 +25,16 @@ final class AcceptanceOperationService
         'operation_not_found', 'operation_request_invalid', 'acceptance_app_not_found',
         'acceptance_profile_not_found', 'acceptance_selector_invalid',
         'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded', 'acceptance_variant_not_executable',
+        'target_module_name_invalid', 'acceptance_hierarchy_key_invalid', 'target_module_not_found',
+        'target_module_exists', 'target_module_path_collision', 'acceptance_source_mapping_invalid',
+        'acceptance_source_mapping_duplicate',
     ];
 
     private const ADMIN_CODES = [
         'operation_registry_invalid', 'operation_registry_duplicate', 'acceptance_registry_invalid',
         'acceptance_registry_duplicate', 'acceptance_catalog_invalid',
         'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
+        'target_module_path_invalid',
     ];
 
     public function __construct(private readonly AcceptanceOperationRegistry $registry) {}
@@ -37,7 +45,9 @@ final class AcceptanceOperationService
         $correlationId = $validCorrelation && $request->correlationId !== null
             ? $request->correlationId : (string) Str::uuid();
         $operation = $this->registry->has($request->operation) ? $request->operation : null;
-        $operationId = $operation === 'acceptance.run' ? (string) Str::uuid() : null;
+        $operationId = in_array($operation, [
+            'acceptance.run', 'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import',
+        ], true) ? (string) Str::uuid() : null;
         $errors = [];
         if ($request->version !== 2) {
             $errors['version'] = ['operation_request_invalid'];
@@ -55,7 +65,7 @@ final class AcceptanceOperationService
         if ($errors !== []) {
             return $this->finish($operation, 'rejected', 'operation_request_invalid', $correlationId, $operationId, errors: $errors);
         }
-        $identityContext = $operation === 'acceptance.run' ? $this->identityContext($request) : [];
+        $identityContext = $this->safeContext($request);
 
         try {
             $handler = $this->registry->resolve($operation);
@@ -66,13 +76,13 @@ final class AcceptanceOperationService
         try {
             $result = $handler->handle($request, $correlationId, $operationId);
             $data = $result->data;
-            if ($data !== null && (($operation === 'acceptance.run' && ! $data instanceof RunOperationData)
-                || ($operation !== 'acceptance.run' && ! $data instanceof CatalogOperationData))) {
+            if (! $this->matchesOperationData($operation, $data)) {
                 throw new \UnexpectedValueException('operation_result_invalid');
             }
             if (($result->status === 'succeeded' && $data === null)
                 || ($result->status === 'rejected' && $data !== null)
-                || ($data instanceof CatalogOperationData && $result->status !== 'succeeded')
+                || (($data instanceof CatalogOperationData || $data instanceof ModuleChangeData
+                    || $data instanceof TargetModuleValidationData) && $result->status !== 'succeeded')
                 || ($data instanceof RunOperationData && ($data->errorCode !== $result->errorCode
                     || ! $this->matchesRequestedIdentity($data, $request)))) {
                 throw new \UnexpectedValueException('operation_result_invalid');
@@ -93,6 +103,14 @@ final class AcceptanceOperationService
 
             return $this->finish($operation, 'failed', $code, $correlationId, $operationId,
                 exceptionClass: $exception::class, identityContext: $identityContext);
+        } catch (TargetModuleException $exception) {
+            $code = in_array($exception->errorCode, OperationResult::ERROR_CODES, true)
+                ? $exception->errorCode : $this->fallback($operation);
+            $status = in_array($code, [...self::REJECTED_CODES, 'target_module_path_invalid'], true)
+                ? 'rejected' : 'failed';
+
+            return $this->finish($operation, $status, $code, $correlationId, $operationId,
+                exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (Throwable) {
             return $this->finish($operation, 'failed', $this->fallback($operation), $correlationId, $operationId,
                 identityContext: $identityContext);
@@ -104,10 +122,15 @@ final class AcceptanceOperationService
     {
         $run = $request->operation === 'acceptance.run';
         $lists = ['app', 'component', 'suite', 'scenario', 'variant', 'capability', 'tag', 'disposition', 'evidence_mode'];
-        $allowed = $run
-            ? ['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key',
-                'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms']
-            : [...$lists, 'limit'];
+        $allowed = match ($request->operation) {
+            'acceptance.run' => ['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key',
+                'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms'],
+            'acceptance.app.create' => ['module_name', 'app_key', 'dry_run'],
+            'acceptance.app.validate' => ['module_name'],
+            'acceptance.component.create' => ['module_name', 'component_key', 'dry_run'],
+            'acceptance.scenarios.import' => ['module_name', 'mappings', 'dry_run'],
+            default => [...$lists, 'limit'],
+        };
         $errors = [];
         foreach ($request->parameters as $field => $value) {
             if (! in_array($field, $allowed, true)) {
@@ -117,12 +140,16 @@ final class AcceptanceOperationService
             }
             $valid = match ($field) {
                 'app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key' => is_string($value)
-                    && strlen($value) <= 64
-                    && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1,
+                    && (! $run || (strlen($value) <= 64
+                        && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1)),
                 'profile_id', 'limit' => is_int($value) || is_string($value),
                 'browser' => $value === null || is_string($value),
                 'headed' => is_bool($value),
                 'timeout_ms', 'slow_mo_ms' => $value === null || is_int($value) || is_string($value),
+                'module_name' => is_string($value),
+                'dry_run' => is_bool($value),
+                'mappings' => is_array($value) && array_is_list($value)
+                    && count(array_filter($value, fn (mixed $entry): bool => $entry instanceof SourceCaseMapping)) === count($value),
                 default => is_array($value) && array_is_list($value)
                     && count(array_filter($value, 'is_string')) === count($value),
             };
@@ -137,13 +164,30 @@ final class AcceptanceOperationService
                 }
             }
         }
+        $required = match ($request->operation) {
+            'acceptance.app.create' => ['module_name', 'app_key'],
+            'acceptance.app.validate' => ['module_name'],
+            'acceptance.component.create' => ['module_name', 'component_key'],
+            'acceptance.scenarios.import' => ['module_name', 'mappings'],
+            default => [],
+        };
+        foreach ($required as $field) {
+            if (! array_key_exists($field, $request->parameters)) {
+                $errors[$field] = ['operation_request_invalid'];
+            }
+        }
 
         return $errors;
     }
 
     private function fallback(string $operation): string
     {
-        return $operation === 'acceptance.run' ? 'acceptance_command_failed' : 'acceptance_catalog_failed';
+        return match ($operation) {
+            'acceptance.run' => 'acceptance_command_failed',
+            'acceptance.app.validate' => 'target_module_validation_failed',
+            'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import' => 'target_module_generation_failed',
+            default => 'acceptance_catalog_failed',
+        };
     }
 
     private function matchesRequestedIdentity(RunOperationData $data, OperationRequest $request): bool
@@ -155,19 +199,51 @@ final class AcceptanceOperationService
             && $data->variantKey === $request->parameters['variant_key'];
     }
 
-    /** Include only fully validated language-neutral identity values in logs. */
-    private function identityContext(OperationRequest $request): array
+    /** Include only validated language-neutral identifiers and flags in logs. */
+    private function safeContext(OperationRequest $request): array
     {
         $context = [];
         foreach (['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key'] as $field) {
-            $value = $request->parameters[$field];
+            $value = $request->parameters[$field] ?? null;
+            if ($value === null) {
+                continue;
+            }
             if (strlen($value) > 64 || ! preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value)) {
                 return [];
             }
             $context[$field] = $value;
         }
+        $moduleName = $request->parameters['module_name'] ?? null;
+        if ($moduleName !== null) {
+            if (! is_string($moduleName) || ! preg_match('/^[A-Z][A-Za-z0-9]{0,63}$/D', $moduleName)) {
+                return [];
+            }
+            $context['module_name'] = $moduleName;
+        }
+        if (isset($request->parameters['dry_run']) && is_bool($request->parameters['dry_run'])) {
+            $context['dry_run'] = $request->parameters['dry_run'];
+        } elseif (in_array($request->operation, [
+            'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import',
+        ], true)) {
+            $context['dry_run'] = true;
+        }
 
         return $context;
+    }
+
+    private function matchesOperationData(string $operation, mixed $data): bool
+    {
+        if ($data === null) {
+            return true;
+        }
+
+        return match ($operation) {
+            'acceptance.run' => $data instanceof RunOperationData,
+            'acceptance.list', 'acceptance.plan' => $data instanceof CatalogOperationData,
+            'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import' => $data instanceof ModuleChangeData,
+            'acceptance.app.validate' => $data instanceof TargetModuleValidationData,
+            default => false,
+        };
     }
 
     private function finish(
@@ -176,7 +252,7 @@ final class AcceptanceOperationService
         ?string $code,
         string $correlationId,
         ?string $operationId,
-        CatalogOperationData|RunOperationData|null $data = null,
+        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|null $data = null,
         array $errors = [],
         ?string $exceptionClass = null,
         array $identityContext = [],
@@ -200,14 +276,26 @@ final class AcceptanceOperationService
         ];
         if ($data instanceof RunOperationData) {
             $context['test_id'] = $data->testId;
+        } elseif ($data instanceof ModuleChangeData) {
+            $context['module_name'] = $data->moduleName;
+            if ($data->appKey !== null) {
+                $context['app_key'] = $data->appKey;
+            }
+            if ($data->componentKey !== null) {
+                $context['component_key'] = $data->componentKey;
+            }
+            $context['dry_run'] = $data->dryRun;
+            $context['change_count'] = count($data->changes);
         }
         if (in_array($exceptionClass, [AcceptanceCatalogException::class, AcceptanceRegistryException::class,
-            AcceptanceExecutionException::class], true)) {
+            AcceptanceExecutionException::class, TargetModuleException::class], true)) {
             $context['exception_class'] = $exceptionClass;
         }
         if ($status !== 'succeeded') {
             Log::log($status === 'rejected' ? 'warning' : 'error', 'tms.acceptance.operation.failed', $context);
-        } elseif ($operation === 'acceptance.run') {
+        } elseif (in_array($operation, [
+            'acceptance.run', 'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import',
+        ], true)) {
             Log::info('tms.acceptance.operation.completed', $context);
         }
 

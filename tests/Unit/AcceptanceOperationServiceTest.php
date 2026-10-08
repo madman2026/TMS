@@ -6,9 +6,13 @@ use App\Acceptance\Operations\AcceptanceOperationRegistry;
 use App\Acceptance\Operations\AcceptanceOperationService;
 use App\Acceptance\Operations\Contracts\AcceptanceOperationHandler;
 use App\Acceptance\Operations\Data\CatalogOperationData;
+use App\Acceptance\Operations\Data\FileChange;
+use App\Acceptance\Operations\Data\ModuleChangeData;
 use App\Acceptance\Operations\Data\OperationRequest;
 use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
+use App\Acceptance\Operations\Data\TargetModuleValidationData;
+use App\Acceptance\Operations\Data\ValidationIssue;
 use App\Data\AcceptancePlan;
 use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
@@ -223,13 +227,18 @@ class AcceptanceOperationServiceTest extends TestCase
     {
         $groups = [
             [['acceptance_app_not_found', 'acceptance_profile_not_found', 'acceptance_selector_invalid',
-                'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded', 'acceptance_variant_not_executable'], 'rejected', [false, true, false]],
+                'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded', 'acceptance_variant_not_executable',
+                'target_module_name_invalid', 'acceptance_hierarchy_key_invalid', 'target_module_not_found',
+                'target_module_exists', 'target_module_path_collision', 'acceptance_source_mapping_invalid',
+                'acceptance_source_mapping_duplicate'], 'rejected', [false, true, false]],
             [['operation_registry_invalid', 'acceptance_registry_invalid', 'acceptance_registry_duplicate',
-                'acceptance_catalog_invalid', 'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate'], 'failed', [false, true, true]],
+                'acceptance_catalog_invalid', 'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
+                'target_module_path_invalid'], 'failed', [false, true, true]],
             [['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], 'failed', [false, true, false]],
             [['acceptance_catalog_changed'], 'failed', [true, false, false]],
             [['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], 'failed', [true, false, true]],
-            [['acceptance_catalog_failed', 'acceptance_command_failed', null], 'failed', [null, null, true]],
+            [['acceptance_catalog_failed', 'acceptance_command_failed', 'target_module_generation_failed',
+                'target_module_validation_failed', null], 'failed', [null, null, true]],
         ];
 
         foreach ($groups as [$codes, $status, $classification]) {
@@ -292,7 +301,8 @@ class AcceptanceOperationServiceTest extends TestCase
         $fieldCode = 'changed';
         $this->assertSame(['parameters' => ['operation_request_invalid']], $result->errors);
 
-        foreach ([OperationRequest::class, OperationResult::class, CatalogOperationData::class, RunOperationData::class] as $class) {
+        foreach ([OperationRequest::class, OperationResult::class, CatalogOperationData::class, RunOperationData::class,
+            FileChange::class, ModuleChangeData::class, ValidationIssue::class, TargetModuleValidationData::class] as $class) {
             $reflection = new ReflectionClass($class);
             $this->assertTrue($reflection->isFinal());
             $this->assertTrue($reflection->isReadOnly());

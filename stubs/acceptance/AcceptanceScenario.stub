@@ -1,0 +1,32 @@
+<?php
+
+namespace $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance\Components\$COMPONENT_CLASS$\Scenarios;
+
+use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\ScenarioMetadata;
+use Modules\Core\Enums\AutomationDisposition;
+use Modules\Core\Enums\EvidenceMode;
+
+final class $SCENARIO_CLASS$ implements AcceptanceScenario
+{
+    public function key(): string
+    {
+        return '$SCENARIO_KEY$';
+    }
+
+    public function name(): string
+    {
+        return '$SCENARIO_KEY$';
+    }
+
+    public function metadata(): ScenarioMetadata
+    {
+        return new ScenarioMetadata([], [], AutomationDisposition::NOT_IMPLEMENTED, EvidenceMode::METADATA_ONLY);
+    }
+
+    public function steps(TestContext $context): iterable
+    {
+        return [];
+    }
+}

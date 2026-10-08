@@ -1,14 +1,16 @@
 # AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010 — Nwidart target module and Component SDK
 
-Status: `ready for execution approval — normalized after accepted hierarchy-cutover Remediation 0001`
+Status: `accepted — technical validation passed; operator accepted on 2026-10-08`
 
 Generated: `2026-10-07`
 
 Normalized: `2026-10-08`
 
+Owner: TMS project
+
 Decision: Decisions 0007, 0008, 0012, 0014, and 0015.
 
-Current Execution Notice (2026-10-08): Remediation 0001 is accepted and this unexecuted Pack is normalized against its clean version-2 hierarchy source. Execution still requires its own explicit operator approval; acceptance and commit remain later separate gates.
+Execution / Acceptance / Commit (2026-10-08): Remediation 0001 remained accepted; the operator separately approved execution, approved the post-execution result, accepted this Pack after its Agent Final Report, and instructed registration and commit. Run 001 records the accepted execution; the commit containing this Pack and Run follows this pre-commit update.
 
 ## 1. Task ID
 
@@ -35,6 +37,14 @@ App -> Component -> Suite -> Scenario -> Variant -> Step
 The installed package is `nwidart/laravel-modules` v12.0.5. Its `ModuleGenerator` is not a service-safe boundary: it requires `Illuminate\Console\Command`, writes progress through console components, calls other Artisan commands, changes activation state, and the native `module:make` command runs `composer dump-autoload`. This Pack therefore reuses the lower-level native repository/path contract, `Nwidart\Modules\Support\Stub`, and `Nwidart\Modules\Generators\FileGenerator`; it does not call Artisan, Symfony Process, `ModuleGenerator::generate()`, Composer, or the activator.
 
 The initial Draft also mentioned Component creation and scenario import but listed only target-module create/validate handlers. Normalization makes those already-required capabilities explicit through separate handlers and DTOs. Pack 0015 will only add Artisan presentation over these operations.
+
+### Execution evidence (2026-10-08)
+
+Implementation created the declared coverage contracts, module creator/validator, typed operation data and handlers, TMS stubs, and five focused test files. It edited only the shared operation boundary, result envelope, provider registration, and two declared regression tests. Nwidart `RepositoryInterface`, `Stub`, and `FileGenerator` are reused below command level; no Artisan, Process, Composer, activator, force, overwrite, target, browser, network, database, environment, Core, or persistent module operation was added.
+
+The final absent-dotenv validation passed all three exact Pack groups: 13 SDK/validator tests with 69 assertions, 59 operation/regression tests with 468 assertions, and 25 CLI regression tests with 569 assertions. The total is 97 tests and 1106 assertions. `list --format=json`, PHP lint over 25 scoped PHP files, scoped Pint, forbidden-API scans, `git diff --check`, protected-path review, and temp/staging cleanup checks passed. Intermediate defects in Windows stub path restoration, normalized candidate paths, native aliases, managed-region idempotency, author validation, CRLF mapping validation, mapping semantics, and hierarchy uniqueness were corrected before the final clean validation.
+
+The operator approved the post-execution gate, received the Agent Final Report, accepted the result, and instructed registration and commit on 2026-10-08. The accepted persistent record is `docs/project/ai/runs/AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010-run-001.md`.
 
 ## 5. Related Release / Phase
 
@@ -97,6 +107,10 @@ Reusable target onboarding, explicit Component/Suite hierarchy, and source-owned
 - `tests/Unit/AcceptanceHierarchyTest.php`
 - `tests/Unit/SourceCaseMappingTest.php`
 - `tests/Feature/TargetModuleOperationServiceTest.php`
+
+### Execution record, after acceptance
+
+- `docs/project/ai/runs/AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010-run-001.md`
 
 ## 9. Files to Edit
 

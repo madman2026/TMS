@@ -1,0 +1,75 @@
+<?php
+
+namespace $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance;
+
+use App\Contracts\AcceptanceComponentProvider;
+use App\Data\ComponentDescriptor;
+use Modules\Core\Contracts\AcceptanceScenario;
+
+final class $MODULE_NAME$AcceptanceApp implements AcceptanceComponentProvider
+{
+    public function key(): string
+    {
+        return '$APP_KEY$';
+    }
+
+    public function catalogVersion(): string
+    {
+        return 'v1';
+    }
+
+    public function components(): iterable
+    {
+        foreach ($this->componentProviders() as $key => $component) {
+            yield new ComponentDescriptor($key);
+        }
+    }
+
+    public function suites(): iterable
+    {
+        foreach ($this->componentProviders() as $component) {
+            yield from $component->suites();
+        }
+    }
+
+    public function scenarios(): iterable
+    {
+        foreach ($this->componentProviders() as $component) {
+            yield from $component->scenarios();
+        }
+    }
+
+    public function variants(string $scenarioKey): iterable
+    {
+        foreach ($this->componentProviders() as $component) {
+            yield from $component->variants($scenarioKey);
+        }
+    }
+
+    public function resolveScenario(
+        string $componentKey,
+        string $suiteKey,
+        string $scenarioKey,
+        string $variantKey,
+    ): ?AcceptanceScenario {
+        $components = $this->componentProviders();
+        if (! isset($components[$componentKey])) {
+            return null;
+        }
+
+        return $components[$componentKey]->resolveScenario(
+            $suiteKey,
+            $scenarioKey,
+            $variantKey,
+        );
+    }
+
+    /** @return array<string, object> */
+    private function componentProviders(): array
+    {
+        return [
+            // <tms:components>
+            // </tms:components>
+        ];
+    }
+}

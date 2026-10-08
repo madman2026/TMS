@@ -17,6 +17,10 @@ final readonly class OperationResult
         'acceptance_catalog_changed', 'acceptance_catalog_failed',
         'acceptance_browser_start_failed', 'acceptance_result_persistence_failed',
         'acceptance_scenario_failed', 'acceptance_step_failed', 'acceptance_command_failed',
+        'target_module_name_invalid', 'acceptance_hierarchy_key_invalid', 'target_module_path_invalid',
+        'target_module_not_found', 'target_module_exists', 'target_module_path_collision',
+        'acceptance_source_mapping_invalid', 'acceptance_source_mapping_duplicate',
+        'target_module_generation_failed', 'target_module_validation_failed',
     ];
 
     public const REQUEST_FIELDS = [
@@ -24,6 +28,7 @@ final readonly class OperationResult
         'capability', 'tag', 'disposition', 'evidence_mode', 'limit', 'app_key',
         'component_key', 'suite_key', 'scenario_key', 'variant_key',
         'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms',
+        'module_name', 'dry_run', 'mappings',
     ];
 
     public array $errors;
@@ -38,7 +43,7 @@ final readonly class OperationResult
         public ?bool $permanent = null,
         public bool $adminActionRequired = false,
         array $errors = [],
-        public CatalogOperationData|RunOperationData|null $data = null,
+        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|null $data = null,
         public int $version = 2,
     ) {
         if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)

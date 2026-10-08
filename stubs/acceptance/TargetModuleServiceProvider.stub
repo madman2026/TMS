@@ -1,0 +1,22 @@
+<?php
+
+namespace $MODULE_NAMESPACE$\$MODULE_NAME$\Providers;
+
+use App\Services\AcceptanceAppRegistry;
+use Illuminate\Support\ServiceProvider;
+use $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance\$MODULE_NAME$AcceptanceApp;
+
+final class $MODULE_NAME$ServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->afterResolving(
+            AcceptanceAppRegistry::class,
+            static function (AcceptanceAppRegistry $registry): void {
+                if ($registry->app('$APP_KEY$') === null) {
+                    $registry->register(new $MODULE_NAME$AcceptanceApp);
+                }
+            },
+        );
+    }
+}

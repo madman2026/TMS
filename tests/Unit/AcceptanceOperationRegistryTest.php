@@ -71,6 +71,16 @@ class AcceptanceOperationRegistryTest extends TestCase
         }
     }
 
+    public function test_target_module_operations_are_valid_registry_names(): void
+    {
+        $registry = new AcceptanceOperationRegistry;
+
+        foreach (['acceptance.app.create', 'acceptance.app.validate', 'acceptance.component.create', 'acceptance.scenarios.import'] as $name) {
+            $registry->register($name, fn () => $this->handler($name));
+            $this->assertTrue($registry->has($name));
+        }
+    }
+
     private function handler(string $name): AcceptanceOperationHandler
     {
         return new class($name) implements AcceptanceOperationHandler
