@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Acceptance\Operations\Data\OperationResult;
 use App\Contracts\AcceptanceCatalogProvider;
 use App\Data\ScenarioDescriptor;
 use App\Data\VariantDescriptor;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceRunService;
 use App\TestStatusEnum;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +30,49 @@ use Tests\TestCase;
 class AcceptanceRunCommandTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function createApplication()
+    {
+        foreach (['bootstrap/cache/config.php', 'bootstrap/cache/pack-0009-config-disabled.php',
+            '__tms_pack_0009_no_dotenv__', '__tms_pack_0009_no_dotenv__.testing'] as $guard) {
+            if (file_exists(__DIR__.'/../../'.$guard)) {
+                throw new RuntimeException('Pack 0009 isolation guard failed.');
+            }
+        }
+        if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite'
+            || getenv('DB_DATABASE') !== ':memory:') {
+            throw new RuntimeException('Pack 0009 requires disposable testing configuration.');
+        }
+        $app = require __DIR__.'/../../bootstrap/app.php';
+        if (file_exists($app->getCachedConfigPath())) {
+            throw new RuntimeException('Pack 0009 isolation guard failed.');
+        }
+        // This runs before RefreshDatabase and retains the framework's trait initialization.
+        $this->traitsUsedByTest = array_flip(class_uses_recursive(static::class));
+        $app->loadEnvironmentFrom('__tms_pack_0009_no_dotenv__');
+        // PHPUnit observes suppressed warnings from dotenv's absent-file probe, too.
+        // Handle only that guarded missing-file warning and forward every other error.
+        $previousHandler = null;
+        $previousHandler = set_error_handler(static function ($severity, $message, $file, $line) use (&$previousHandler) {
+            if ($severity === E_WARNING && str_contains($message, '__tms_pack_0009_no_dotenv__')
+                && str_ends_with(str_replace('\\', '/', $file), '/vendor/vlucas/phpdotenv/src/Store/File/Reader.php')) {
+                return true;
+            }
+
+            return $previousHandler !== null ? $previousHandler($severity, $message, $file, $line) : false;
+        });
+        try {
+            $app->make(Kernel::class)->bootstrap();
+        } finally {
+            restore_error_handler();
+        }
+        if ($app->environment() !== 'testing' || $app['config']->get('database.default') !== 'sqlite'
+            || $app['config']->get('database.connections.sqlite.database') !== ':memory:') {
+            throw new RuntimeException('Pack 0009 booted an unsafe database configuration.');
+        }
+
+        return $app;
+    }
 
     public function test_command_is_auto_discovered_with_the_expected_arguments_and_options(): void
     {
@@ -252,12 +297,9 @@ class AcceptanceRunCommandTest extends TestCase
             ->doesntExpectOutputToContain('example-sensitive-value')
             ->assertExitCode(1);
 
-        Log::shouldHaveReceived('error')->once()->with(
-            'tms.acceptance.command.failed',
-            Mockery::on(fn (array $context): bool => $context === [
-                'error_code' => 'acceptance_command_failed',
-                'exception_class' => RuntimeException::class,
-            ]),
+        Log::shouldHaveReceived('log')->once()->with(
+            'error', 'tms.acceptance.operation.failed',
+            Mockery::on(fn (array $context): bool => $this->operationLog($context, 'acceptance_command_failed')),
         );
     }
 
@@ -279,10 +321,9 @@ class AcceptanceRunCommandTest extends TestCase
 
         $this->assertDatabaseCount('tests', 0);
         $this->assertDatabaseCount('steps', 0);
-        Log::shouldHaveReceived('error')->once()->with('tms.acceptance.command.failed', [
-            'error_code' => 'acceptance_registry_invalid',
-            'exception_class' => AcceptanceRegistryException::class,
-        ]);
+        Log::shouldHaveReceived('log')->once()->with('error', 'tms.acceptance.operation.failed',
+            Mockery::on(fn (array $context): bool => $this->operationLog($context, 'acceptance_registry_invalid',
+                AcceptanceRegistryException::class)));
         Log::shouldNotHaveReceived('warning');
     }
 
@@ -427,5 +468,21 @@ class AcceptanceRunCommandTest extends TestCase
             'status' => 'rejected',
             'error_code' => $errorCode,
         ], JSON_THROW_ON_ERROR);
+    }
+
+    private function operationLog(array $context, string $code, ?string $exceptionClass = null): bool
+    {
+        $this->assertSame('acceptance.run', $context['operation']);
+        $this->assertSame($code, $context['error_code']);
+        $this->assertTrue(OperationResult::isUuid($context['correlation_id']));
+        $this->assertTrue(OperationResult::isUuid($context['operation_id']));
+        $this->assertSame($exceptionClass, $context['exception_class'] ?? null);
+        $this->assertStringNotContainsString('example-sensitive-value', json_encode($context, JSON_THROW_ON_ERROR));
+        $this->assertSame([], array_diff(array_keys($context), [
+            'operation', 'error_code', 'correlation_id', 'operation_id', 'retryable',
+            'permanent', 'admin_action_required', 'exception_class',
+        ]));
+
+        return true;
     }
 }

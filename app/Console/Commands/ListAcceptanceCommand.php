@@ -2,39 +2,47 @@
 
 namespace App\Console\Commands;
 
+use App\Acceptance\Operations\AcceptanceOperationService;
+use App\Acceptance\Operations\Data\CatalogOperationData;
+use App\Acceptance\Operations\Data\OperationRequest;
+use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
-use App\Exceptions\AcceptanceCatalogException;
-use App\Services\AcceptancePlanner;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /** JSON-only inspection; the planner never enters the execution pipeline. */
 class ListAcceptanceCommand extends Command
 {
     protected $signature = 'acceptance:list '.AcceptanceSelector::OPTIONS;
 
-    public function handle(AcceptancePlanner $planner): int
+    public function handle(AcceptanceOperationService $service): int
     {
-        try {
-            $plan = $planner->plan(AcceptanceSelector::fromOptions($this->options()));
-            $this->line(json_encode($plan->toArray($this->planning()), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-
-            return self::SUCCESS;
-        } catch (Throwable $failure) {
-            $exception = $failure instanceof AcceptanceCatalogException
-                ? $failure : AcceptanceCatalogException::because('acceptance_catalog_failed');
-            Log::log($exception->rejected() ? 'warning' : 'error', 'tms.acceptance.catalog.failed', [
-                'command' => $this->planning() ? 'acceptance:plan' : 'acceptance:list',
-                'error_code' => $exception->errorCode,
-            ]);
-            $this->line(json_encode([
-                'status' => $exception->rejected() ? 'rejected' : 'failed',
-                'error_code' => $exception->errorCode,
-            ], JSON_THROW_ON_ERROR));
-
-            return $exception->rejected() ? self::INVALID : self::FAILURE;
+        $parameters = [];
+        foreach (['app', 'scenario', 'variant', 'suite', 'capability', 'tag', 'disposition', 'limit'] as $option) {
+            $parameters[$option] = $this->option($option);
         }
+        $parameters['evidence_mode'] = $this->option('evidence-mode');
+        $result = $service->execute(new OperationRequest($this->planning() ? 'acceptance.plan' : 'acceptance.list', $parameters));
+        if ($result->status !== 'succeeded') {
+            $this->line(json_encode(['status' => $result->status, 'error_code' => $result->errorCode], JSON_THROW_ON_ERROR));
+
+            return $result->status === 'rejected' ? self::INVALID : self::FAILURE;
+        }
+        /** @var CatalogOperationData $data */
+        $data = $result->data;
+        // The accepted JSON map and field-order conventions belong only to this client.
+        $this->line(json_encode([
+            'status' => $this->planning() ? 'planned' : 'listed',
+            'plan_version' => $data->planVersion,
+            'catalog_versions' => (object) $data->catalogVersions,
+            'counts' => [
+                'matched' => $data->matched, 'executable' => $data->executable,
+                'excluded' => $data->excluded, 'by_disposition' => $data->byDisposition,
+            ],
+            'fingerprint' => $data->fingerprint,
+            'items' => array_map(fn (AcceptancePlanItem $item): array => $item->toArray(), $data->items),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+
+        return self::SUCCESS;
     }
 
     protected function planning(): bool

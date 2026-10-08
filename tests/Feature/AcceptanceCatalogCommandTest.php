@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Acceptance\Operations\Data\OperationResult;
 use App\Contracts\AcceptanceCatalogProvider;
 use App\Data\AcceptanceSelector;
 use App\Data\ScenarioDescriptor;
@@ -11,6 +12,7 @@ use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceCatalog;
 use App\Services\AcceptancePlanner;
 use App\Services\AcceptanceRunService;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +33,49 @@ use Tests\TestCase;
 
 class AcceptanceCatalogCommandTest extends TestCase
 {
+    public function createApplication()
+    {
+        foreach (['bootstrap/cache/config.php', 'bootstrap/cache/pack-0009-config-disabled.php',
+            '__tms_pack_0009_no_dotenv__', '__tms_pack_0009_no_dotenv__.testing'] as $guard) {
+            if (file_exists(__DIR__.'/../../'.$guard)) {
+                throw new RuntimeException('Pack 0009 isolation guard failed.');
+            }
+        }
+        if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite'
+            || getenv('DB_DATABASE') !== ':memory:') {
+            throw new RuntimeException('Pack 0009 requires disposable testing configuration.');
+        }
+        $app = require __DIR__.'/../../bootstrap/app.php';
+        if (file_exists($app->getCachedConfigPath())) {
+            throw new RuntimeException('Pack 0009 isolation guard failed.');
+        }
+        // Preserve Laravel test-trait initialization while selecting a deliberately absent file.
+        $this->traitsUsedByTest = array_flip(class_uses_recursive(static::class));
+        $app->loadEnvironmentFrom('__tms_pack_0009_no_dotenv__');
+        // PHPUnit observes suppressed warnings from dotenv's absent-file probe, too.
+        // Handle only that guarded missing-file warning and forward every other error.
+        $previousHandler = null;
+        $previousHandler = set_error_handler(static function ($severity, $message, $file, $line) use (&$previousHandler) {
+            if ($severity === E_WARNING && str_contains($message, '__tms_pack_0009_no_dotenv__')
+                && str_ends_with(str_replace('\\', '/', $file), '/vendor/vlucas/phpdotenv/src/Store/File/Reader.php')) {
+                return true;
+            }
+
+            return $previousHandler !== null ? $previousHandler($severity, $message, $file, $line) : false;
+        });
+        try {
+            $app->make(Kernel::class)->bootstrap();
+        } finally {
+            restore_error_handler();
+        }
+        if ($app->environment() !== 'testing' || $app['config']->get('database.default') !== 'sqlite'
+            || $app['config']->get('database.connections.sqlite.database') !== ':memory:') {
+            throw new RuntimeException('Pack 0009 booted an unsafe database configuration.');
+        }
+
+        return $app;
+    }
+
     private ?ConnectionResolverInterface $originalResolver = null;
 
     private int $executionBoundaryCalls = 0;
@@ -157,8 +202,9 @@ class AcceptanceCatalogCommandTest extends TestCase
                 $this->assertSame(['status' => $exit === 2 ? 'rejected' : 'failed', 'error_code' => $code], $result);
                 Log::shouldHaveReceived('log')->once()->with(
                     $exit === 2 ? 'warning' : 'error',
-                    'tms.acceptance.catalog.failed',
-                    ['command' => $command, 'error_code' => $code],
+                    'tms.acceptance.operation.failed',
+                    Mockery::on(fn (array $context): bool => $this->operationLog($context,
+                        $command === 'acceptance:list' ? 'acceptance.list' : 'acceptance.plan', $code)),
                 );
                 $this->assertNoProviderExecution($app);
             }
@@ -192,10 +238,9 @@ class AcceptanceCatalogCommandTest extends TestCase
             'app' => 'local-app', 'scenario' => 'manual-only', 'profile' => 'example-token-sentinel',
         ], 2);
         $this->assertSame(['status' => 'rejected', 'error_code' => 'acceptance_variant_not_executable'], $result);
-        Log::shouldHaveReceived('warning')->once()->with('tms.acceptance.command.failed', [
-            'error_code' => 'acceptance_variant_not_executable',
-            'exception_class' => AcceptanceCatalogException::class,
-        ]);
+        Log::shouldHaveReceived('log')->once()->with('warning', 'tms.acceptance.operation.failed',
+            Mockery::on(fn (array $context): bool => $this->operationLog($context,
+                'acceptance.run', 'acceptance_variant_not_executable')));
         $this->assertNoProviderExecution($app);
     }
 
@@ -207,6 +252,24 @@ class AcceptanceCatalogCommandTest extends TestCase
         $this->assertSafe($output);
 
         return json_decode($output, true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function operationLog(array $context, string $operation, string $code): bool
+    {
+        $this->assertSame($operation, $context['operation']);
+        $this->assertSame($code, $context['error_code']);
+        $this->assertTrue(OperationResult::isUuid($context['correlation_id']));
+        $this->assertSame($operation === 'acceptance.run', $context['operation_id'] !== null);
+        if ($context['operation_id'] !== null) {
+            $this->assertTrue(OperationResult::isUuid($context['operation_id']));
+        }
+        $this->assertSafe(json_encode($context, JSON_THROW_ON_ERROR));
+        $this->assertSame([], array_diff(array_keys($context), [
+            'operation', 'error_code', 'correlation_id', 'operation_id', 'retryable',
+            'permanent', 'admin_action_required', 'exception_class',
+        ]));
+
+        return true;
     }
 
     private function assertSafe(string $text): void

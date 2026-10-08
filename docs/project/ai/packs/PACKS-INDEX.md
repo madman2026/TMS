@@ -10,6 +10,7 @@ This index owns TMS project-wide and repository-governance Pack navigation. Modu
 | Generic Acceptance Scenario Contracts (0004) | accepted — technical validation passed; operator accepted | `docs/project/ai/packs/AI-PACK-TMS-GENERIC-ACCEPTANCE-CONTRACTS-0004.md` |
 | Lazy Scenario Catalog and Variant Dispatcher (0007) | accepted — technical validation passed; bounded catalog/dispatcher foundation accepted | `docs/project/ai/packs/AI-PACK-TMS-SCENARIO-CATALOG-DISPATCHER-0007.md` |
 | Sequential Resumable Batch CLI Execution (0008) | draft — predecessor accepted; normalization and separate approval required | `docs/project/ai/packs/AI-PACK-TMS-BATCH-CLI-EXECUTION-0008.md` |
+| Transport-neutral Acceptance operation layer (0009) | accepted — technical validation passed; operator accepted 2026-10-08 | `docs/project/ai/packs/AI-PACK-TMS-OPERATION-SERVICE-LAYER-0009.md` |
 
 Read only the current Pack required for the active task. An executed Pack and Run remain unaccepted until the operator completes the stated acceptance gate.
 
