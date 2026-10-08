@@ -71,11 +71,13 @@ class AcceptanceOperationRegistryTest extends TestCase
         }
     }
 
-    public function test_target_module_operations_are_valid_registry_names(): void
+    public function test_target_module_and_prerequisite_operations_are_valid_registry_names(): void
     {
         $registry = new AcceptanceOperationRegistry;
 
-        foreach (['acceptance.app.create', 'acceptance.app.validate', 'acceptance.component.create', 'acceptance.scenarios.import'] as $name) {
+        foreach (['acceptance.app.create', 'acceptance.app.validate', 'acceptance.component.create', 'acceptance.scenarios.import',
+            'acceptance.prerequisite.request.prepare', 'acceptance.prerequisite.input.submit',
+            'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel'] as $name) {
             $registry->register($name, fn () => $this->handler($name));
             $this->assertTrue($registry->has($name));
         }

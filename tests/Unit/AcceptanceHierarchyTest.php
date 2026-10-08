@@ -67,6 +67,8 @@ class AcceptanceHierarchyTest extends TestCase
         $this->assertSame(['invoice-creates', 'invoice-deletes'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->scenarios())));
         $this->assertSame(['default'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->variants('invoice-creates'))));
         $this->assertSame(['default'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->variants('invoice-deletes'))));
+        $this->assertSame('none-v1', iterator_to_array($provider->variants('invoice-creates'))[0]->prerequisiteSchema->version);
+        $this->assertSame([], iterator_to_array($provider->variants('invoice-creates'))[0]->prerequisiteSchema->inputs);
         $scenario = $provider->resolveScenario('billing', 'invoices', 'invoice-creates', 'default');
         $this->assertSame('invoice-creates', $scenario?->key());
         $this->assertSame(AutomationDisposition::NOT_IMPLEMENTED, $scenario?->metadata()->disposition);

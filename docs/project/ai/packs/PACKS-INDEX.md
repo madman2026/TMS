@@ -12,7 +12,7 @@ This index owns TMS project-wide and repository-governance Pack navigation. Modu
 | Sequential Resumable Batch CLI Execution (0008) | superseded — historical Draft; do not normalize or execute | `docs/project/ai/packs/AI-PACK-TMS-BATCH-CLI-EXECUTION-0008.md` |
 | Transport-neutral Acceptance operation layer (0009) | accepted — technical validation passed; operator accepted 2026-10-08 | `docs/project/ai/packs/AI-PACK-TMS-OPERATION-SERVICE-LAYER-0009.md` |
 | Nwidart target module and Component SDK (0010) | accepted — technical validation passed; operator accepted 2026-10-08 | `docs/project/ai/packs/AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010.md` |
-| Operator input and approval workflow (0011) | draft — normalize against Decision 0015 and accepted Packs 0010 | `docs/project/ai/packs/AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011.md` |
+| Operator input and approval workflow (0011) | in-progress — execution approved 2026-10-08; operation names governed by Decision 0016 | `docs/project/ai/packs/AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011.md` |
 | Target resource lifecycle contracts (0012) | draft — normalize against Decision 0015 and accepted predecessors | `docs/project/ai/packs/AI-PACK-TMS-TARGET-RESOURCE-LIFECYCLE-0012.md` |
 | Async Queue and Bus Batch orchestration (0013) | draft — stage 7 under Decision 0015; normalize after Core stage 6 | `docs/project/ai/packs/AI-PACK-TMS-ASYNC-BATCH-ORCHESTRATION-0013.md` |
 | Query, reporting, evidence, and traceability (0014) | draft — stage 8 under Decision 0015; normalize after Pack 0013 | `docs/project/ai/packs/AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014.md` |

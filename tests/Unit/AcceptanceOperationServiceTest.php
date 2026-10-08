@@ -13,6 +13,12 @@ use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Operations\Data\TargetModuleValidationData;
 use App\Acceptance\Operations\Data\ValidationIssue;
+use App\Acceptance\Prerequisites\Data\ApprovalFact;
+use App\Acceptance\Prerequisites\Data\ApprovalRequirement;
+use App\Acceptance\Prerequisites\Data\InputRequirement;
+use App\Acceptance\Prerequisites\Data\OperatorContext;
+use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
 use App\Data\AcceptancePlan;
 use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
@@ -230,15 +236,17 @@ class AcceptanceOperationServiceTest extends TestCase
                 'acceptance_selector_not_found', 'acceptance_catalog_limit_exceeded', 'acceptance_variant_not_executable',
                 'target_module_name_invalid', 'acceptance_hierarchy_key_invalid', 'target_module_not_found',
                 'target_module_exists', 'target_module_path_collision', 'acceptance_source_mapping_invalid',
-                'acceptance_source_mapping_duplicate'], 'rejected', [false, true, false]],
+                'acceptance_source_mapping_duplicate', 'prerequisite_request_not_found', 'input_required',
+                'approval_required', 'input_invalid', 'secret_literal_forbidden', 'approval_stale',
+                'request_expired', 'invalid_transition'], 'rejected', [false, true, false]],
             [['operation_registry_invalid', 'acceptance_registry_invalid', 'acceptance_registry_duplicate',
                 'acceptance_catalog_invalid', 'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
-                'target_module_path_invalid'], 'failed', [false, true, true]],
+                'target_module_path_invalid', 'prerequisite_schema_invalid', 'schema_changed'], 'failed', [false, true, true]],
             [['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], 'failed', [false, true, false]],
-            [['acceptance_catalog_changed'], 'failed', [true, false, false]],
+            [['acceptance_catalog_changed', 'conflict'], 'failed', [true, false, false]],
             [['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], 'failed', [true, false, true]],
             [['acceptance_catalog_failed', 'acceptance_command_failed', 'target_module_generation_failed',
-                'target_module_validation_failed', null], 'failed', [null, null, true]],
+                'target_module_validation_failed', 'prerequisite_persistence_failed', null], 'failed', [null, null, true]],
         ];
 
         foreach ($groups as [$codes, $status, $classification]) {
@@ -302,7 +310,9 @@ class AcceptanceOperationServiceTest extends TestCase
         $this->assertSame(['parameters' => ['operation_request_invalid']], $result->errors);
 
         foreach ([OperationRequest::class, OperationResult::class, CatalogOperationData::class, RunOperationData::class,
-            FileChange::class, ModuleChangeData::class, ValidationIssue::class, TargetModuleValidationData::class] as $class) {
+            FileChange::class, ModuleChangeData::class, ValidationIssue::class, TargetModuleValidationData::class,
+            InputRequirement::class, ApprovalRequirement::class, PrerequisiteSchema::class, OperatorContext::class,
+            ApprovalFact::class, PrerequisiteOperationData::class] as $class) {
             $reflection = new ReflectionClass($class);
             $this->assertTrue($reflection->isFinal());
             $this->assertTrue($reflection->isReadOnly());
@@ -351,6 +361,28 @@ class AcceptanceOperationServiceTest extends TestCase
         $this->assertInstanceOf(CatalogOperationData::class, $result->data);
         Log::shouldNotHaveReceived('log');
         Log::shouldNotHaveReceived('info');
+    }
+
+    public function test_prerequisite_operation_rejects_the_wrong_typed_payload(): void
+    {
+        $operation = 'acceptance.prerequisite.request.cancel';
+        $service = $this->serviceFor($operation, fn ($request, $correlation, $operationId): OperationResult => new OperationResult(
+            $operation,
+            'succeeded',
+            null,
+            $correlation,
+            $operationId,
+            data: $this->catalog(),
+        ));
+
+        $result = $service->execute(new OperationRequest($operation, [
+            'request_id' => self::UUID,
+            'expected_lock_version' => 0,
+        ]));
+
+        $this->assertSame('failed', $result->status);
+        $this->assertSame('prerequisite_persistence_failed', $result->errorCode);
+        $this->assertNull($result->data);
     }
 
     private function service(AcceptanceOperationHandler $handler): AcceptanceOperationService

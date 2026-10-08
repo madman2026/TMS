@@ -2,6 +2,7 @@
 
 namespace App\Acceptance\Operations\Data;
 
+use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use InvalidArgumentException;
 
 /** Safe semantic result; no transport schema, human message or serializer. */
@@ -21,6 +22,10 @@ final readonly class OperationResult
         'target_module_not_found', 'target_module_exists', 'target_module_path_collision',
         'acceptance_source_mapping_invalid', 'acceptance_source_mapping_duplicate',
         'target_module_generation_failed', 'target_module_validation_failed',
+        'prerequisite_request_not_found', 'prerequisite_schema_invalid', 'input_required',
+        'approval_required', 'schema_changed', 'input_invalid', 'secret_literal_forbidden',
+        'approval_stale', 'request_expired', 'invalid_transition', 'conflict',
+        'prerequisite_persistence_failed',
     ];
 
     public const REQUEST_FIELDS = [
@@ -29,6 +34,7 @@ final readonly class OperationResult
         'component_key', 'suite_key', 'scenario_key', 'variant_key',
         'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms',
         'module_name', 'dry_run', 'mappings',
+        'request_id', 'expected_lock_version', 'inputs', 'scope',
     ];
 
     public array $errors;
@@ -43,7 +49,7 @@ final readonly class OperationResult
         public ?bool $permanent = null,
         public bool $adminActionRequired = false,
         array $errors = [],
-        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|null $data = null,
+        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|null $data = null,
         public int $version = 2,
     ) {
         if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)
