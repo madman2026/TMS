@@ -290,7 +290,6 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         }
         $sources = [];
         $identities = [];
-        $replacements = [];
         foreach ($mappings as $mapping) {
             if (! $mapping instanceof SourceCaseMapping) {
                 throw TargetModuleException::because('acceptance_source_mapping_invalid');
@@ -306,14 +305,6 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
                     throw TargetModuleException::because('acceptance_source_mapping_duplicate');
                 }
                 $identities[$key] = true;
-            }
-            $replacement = $mapping->replacementIdentity();
-            if ($replacement !== null) {
-                $key = implode("\0", $replacement);
-                if (isset($replacements[$key])) {
-                    throw TargetModuleException::because('acceptance_source_mapping_duplicate');
-                }
-                $replacements[$key] = true;
             }
         }
     }
@@ -388,16 +379,6 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         if ($identity !== null) {
             $fragment = 'componentKey: '.$this->literal($identity[0]).', suiteKey: '.$this->literal($identity[1])
                 .', scenarioKey: '.$this->literal($identity[2]).', variantKey: '.$this->literal($identity[3]);
-            if (str_contains($content, $fragment)) {
-                throw TargetModuleException::because('acceptance_source_mapping_duplicate');
-            }
-        }
-        $replacement = $mapping->replacementIdentity();
-        if ($replacement !== null) {
-            $fragment = 'replacementComponentKey: '.$this->literal($replacement[0])
-                .', replacementSuiteKey: '.$this->literal($replacement[1])
-                .', replacementScenarioKey: '.$this->literal($replacement[2])
-                .', replacementVariantKey: '.$this->literal($replacement[3]);
             if (str_contains($content, $fragment)) {
                 throw TargetModuleException::because('acceptance_source_mapping_duplicate');
             }

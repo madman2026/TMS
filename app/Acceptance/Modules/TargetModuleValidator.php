@@ -343,7 +343,6 @@ final class TargetModuleValidator
 
         $sources = [];
         $identities = [];
-        $replacements = [];
         foreach ($matches as $match) {
             try {
                 $mapping = new SourceCaseMapping(
@@ -365,21 +364,15 @@ final class TargetModuleValidator
                 return false;
             }
             $identity = $mapping->executableIdentity();
-            $replacement = $mapping->replacementIdentity();
             $identityKey = $identity === null ? null : implode("\0", $identity);
-            $replacementKey = $replacement === null ? null : implode("\0", $replacement);
             if (isset($sources[$mapping->sourceCaseId])
                 || ($identityKey !== null && isset($identities[$identityKey]))
-                || ($replacementKey !== null && isset($replacements[$replacementKey]))
                 || ! $this->mappingIdentityValid($mapping, $components, $suites, $scenarios, $variants)) {
                 return false;
             }
             $sources[$mapping->sourceCaseId] = true;
             if ($identityKey !== null) {
                 $identities[$identityKey] = true;
-            }
-            if ($replacementKey !== null) {
-                $replacements[$replacementKey] = true;
             }
         }
 

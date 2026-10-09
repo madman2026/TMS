@@ -114,6 +114,25 @@ class TargetModuleValidatorTest extends TestCase
         $this->assertContains('acceptance_source_mapping_invalid', array_column($result->issues, 'code'));
     }
 
+    public function test_multiple_merged_sources_may_reference_one_valid_replacement(): void
+    {
+        $modules = $this->modules();
+        $config = $this->config();
+        $creator = new NwidartTargetModuleCreator($modules, $this->files, $config, $this->validator);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-source', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+            $this->mergedMapping('case-merged-1'),
+            $this->mergedMapping('case-merged-2'),
+        ], false);
+
+        $result = $this->validator->validate('ExampleTarget');
+
+        $this->assertTrue($result->valid);
+        $this->assertSame([], $result->issues);
+    }
+
     public function test_duplicate_hierarchy_entries_are_rejected_deterministically(): void
     {
         $modules = $this->modules();
@@ -151,6 +170,21 @@ class TargetModuleValidatorTest extends TestCase
             'namespace' => 'Modules', 'paths' => ['app_folder' => 'app/'],
             'composer' => ['vendor' => 'example', 'author' => ['name' => 'Example', 'email' => 'example@example.test']],
         ]]);
+    }
+
+    private function mergedMapping(string $sourceCaseId): SourceCaseMapping
+    {
+        return new SourceCaseMapping(
+            sourceCaseId: $sourceCaseId,
+            disposition: CoverageDisposition::MERGED_EQUIVALENT,
+            replacementComponentKey: 'billing',
+            replacementSuiteKey: 'invoices',
+            replacementScenarioKey: 'invoice-creates',
+            replacementVariantKey: 'default',
+            reason: 'same executable behavior',
+            coveredAssertions: ['creates'],
+            uncoveredAssertions: ['duplicate'],
+        );
     }
 
     /** @return array<string, string> */

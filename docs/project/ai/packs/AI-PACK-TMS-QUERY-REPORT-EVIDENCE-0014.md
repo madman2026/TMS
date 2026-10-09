@@ -1,12 +1,14 @@
 # AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014 — Query, reporting, evidence, and traceability
 
-Status: `draft — stage 8 under Decision 0015; normalize after accepted Pack 0013`
+Status: `blocked — needs regeneration after committed Remediation 0002`
 
 Generated: `2026-10-07`
 
 Decision: Decisions 0008, 0010, 0012, 0013, and 0014; Decision 0014 applied on 2026-10-08 (documentation only).
 
 Current Roadmap Notice (2026-10-08): Decision 0015 supersedes former stage numbering and requires all reports to use the complete hierarchy tuple without legacy projections. Normalize before approval.
+
+Conflict Notice (2026-10-10): regeneration found that accepted Pack 0010 source rejects repeated merged replacement identities, which prevents Decision 0012 many-to-one reconciliation. Change Request 0005 is approved and Remediation 0002 must be executed, accepted, and committed before this Pack is regenerated and receives a new execution gate.
 
 ## 1. Task ID
 

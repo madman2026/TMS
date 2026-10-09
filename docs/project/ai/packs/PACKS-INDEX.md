@@ -15,7 +15,7 @@ This index owns TMS project-wide and repository-governance Pack navigation. Modu
 | Operator input and approval workflow (0011) | accepted — technical validation passed; operator accepted 2026-10-09 | `docs/project/ai/packs/AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011.md` |
 | Target resource lifecycle contracts (0012) | accepted — technical validation passed; operator accepted 2026-10-09 | `docs/project/ai/packs/AI-PACK-TMS-TARGET-RESOURCE-LIFECYCLE-0012.md` |
 | Async Queue and Bus Batch orchestration (0013) | accepted — technical validation passed; operator accepted 2026-10-10 | `docs/project/ai/packs/AI-PACK-TMS-ASYNC-BATCH-ORCHESTRATION-0013.md` |
-| Query, reporting, evidence, and traceability (0014) | draft — stage 8 under Decision 0015; normalize after Pack 0013 | `docs/project/ai/packs/AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014.md` |
+| Query, reporting, evidence, and traceability (0014) | blocked — regenerate after accepted/committed Remediation 0002 | `docs/project/ai/packs/AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014.md` |
 | Complete Artisan operator client (0015) | draft — stage 9; legacy-projection clauses superseded by Decision 0015 | `docs/project/ai/packs/AI-PACK-TMS-ARTISAN-OPERATOR-CLIENT-0015.md` |
 | DK target module and owner bootstrap (0016) | draft — stage 10 under Decision 0015 | `docs/project/ai/packs/AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016.md` |
 | Second-target proof and scale hardening (0017) | draft — stage 16; regenerate after owner-local stages 11–15 | `docs/project/ai/packs/AI-PACK-TMS-SECOND-TARGET-SCALE-HARDENING-0017.md` |

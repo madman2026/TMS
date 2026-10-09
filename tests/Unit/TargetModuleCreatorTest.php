@@ -161,6 +161,30 @@ class TargetModuleCreatorTest extends TestCase
         ], false);
     }
 
+    public function test_merged_sources_can_share_one_replacement_in_same_and_later_imports(): void
+    {
+        $creator = $this->creator();
+        $creator->create(new TargetModuleDefinition('ExampleTarget', 'example-app'), false);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-source', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+        ], false);
+
+        $creator->importScenarios('ExampleTarget', [
+            $this->mergedMapping('case-merged-1'),
+            $this->mergedMapping('case-merged-2'),
+        ], false);
+        $creator->importScenarios('ExampleTarget', [
+            $this->mergedMapping('case-merged-3'),
+        ], false);
+
+        $source = $this->files->get($this->root.'/ExampleTarget/app/Acceptance/Coverage/SourceCaseMappings.php');
+        $this->assertSame(3, substr_count($source, "replacementScenarioKey: 'invoice-creates'"));
+        $this->assertFileExists($this->root.'/ExampleTarget/app/Acceptance/Components/Billing/Scenarios/InvoiceCreates.php');
+        $this->assertTrue($this->validator()->validate('ExampleTarget')->valid);
+    }
+
     private function creator(?Filesystem $files = null): NwidartTargetModuleCreator
     {
         $files ??= $this->files;
@@ -214,5 +238,20 @@ class TargetModuleCreatorTest extends TestCase
             new SourceCaseMapping('case-excluded', CoverageDisposition::EXCLUDED_HUMAN_JUDGMENT,
                 reason: 'subjective', uncoveredAssertions: ['visual-quality']),
         ];
+    }
+
+    private function mergedMapping(string $sourceCaseId): SourceCaseMapping
+    {
+        return new SourceCaseMapping(
+            sourceCaseId: $sourceCaseId,
+            disposition: CoverageDisposition::MERGED_EQUIVALENT,
+            replacementComponentKey: 'billing',
+            replacementSuiteKey: 'invoices',
+            replacementScenarioKey: 'invoice-creates',
+            replacementVariantKey: 'default',
+            reason: 'same executable behavior',
+            coveredAssertions: ['creates'],
+            uncoveredAssertions: ['duplicate'],
+        );
     }
 }
