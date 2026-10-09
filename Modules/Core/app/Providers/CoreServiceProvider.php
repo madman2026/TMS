@@ -5,8 +5,13 @@ namespace Modules\Core\Providers;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\BrowserFactory;
+use Modules\Core\Contracts\ExecutorRegistry;
+use Modules\Core\Services\BrowserAcceptanceExecutor;
+use Modules\Core\Services\ExplicitExecutorRegistry;
+use Modules\Core\Services\HttpAcceptanceExecutor;
 use Modules\Core\Services\PlaywrightBrowserFactory;
 use Nwidart\Modules\Traits\PathNamespace;
+use Psr\Log\LoggerInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
@@ -37,6 +42,13 @@ class CoreServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(BrowserFactory::class, PlaywrightBrowserFactory::class);
+        $this->app->singleton(ExecutorRegistry::class, fn ($app): ExplicitExecutorRegistry => new ExplicitExecutorRegistry(
+            executors: [
+                $app->make(BrowserAcceptanceExecutor::class),
+                $app->make(HttpAcceptanceExecutor::class),
+            ],
+            logger: $app->make(LoggerInterface::class),
+        ));
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
     }
