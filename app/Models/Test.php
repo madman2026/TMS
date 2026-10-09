@@ -6,6 +6,7 @@ use App\TestStatusEnum;
 use Database\Factories\TestFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Test extends Model
 {
@@ -41,5 +42,10 @@ class Test extends Model
     public function steps()
     {
         return $this->hasMany(Step::class);
+    }
+
+    public function acceptanceExecutionAttempt(): HasOne
+    {
+        return $this->hasOne(AcceptanceExecutionAttempt::class);
     }
 }

@@ -3,6 +3,10 @@
 namespace App\Acceptance\Operations;
 
 use App\Acceptance\Coverage\Data\SourceCaseMapping;
+use App\Acceptance\Execution\AcceptanceExecutionException as BatchExecutionException;
+use App\Acceptance\Execution\Data\BatchItemOperationData;
+use App\Acceptance\Execution\Data\BatchOperationData;
+use App\Acceptance\Execution\Data\BatchPrerequisiteReference;
 use App\Acceptance\Modules\TargetModuleException;
 use App\Acceptance\Operations\Data\CatalogOperationData;
 use App\Acceptance\Operations\Data\ModuleChangeData;
@@ -34,6 +38,9 @@ final class AcceptanceOperationService
         'prerequisite_request_not_found', 'input_required', 'approval_required', 'input_invalid',
         'secret_literal_forbidden', 'approval_stale', 'request_expired', 'invalid_transition',
         'prerequisite_request_mismatch', 'unsafe_target', 'target_not_ready', 'resource_unavailable',
+        'acceptance_batch_not_found', 'acceptance_batch_empty', 'acceptance_batch_conflict',
+        'acceptance_batch_transition_invalid', 'acceptance_batch_plan_changed',
+        'acceptance_attempt_not_found', 'acceptance_retry_not_safe', 'acceptance_batch_cancelled',
     ];
 
     private const ADMIN_CODES = [
@@ -57,7 +64,11 @@ final class AcceptanceOperationService
             'acceptance.run', 'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import',
             'acceptance.prerequisite.request.prepare', 'acceptance.prerequisite.input.submit',
             'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel',
-        ], true) ? (string) Str::uuid() : null;
+            'acceptance.batch.start', 'acceptance.batch.item.retry',
+        ], true) ? (string) Str::uuid() : (in_array($operation, ['acceptance.batch.resume', 'acceptance.batch.cancel'], true)
+            && is_string($request->parameters['operation_id'] ?? null)
+            && OperationResult::isUuid($request->parameters['operation_id'])
+                ? $request->parameters['operation_id'] : null);
         $errors = [];
         if ($request->version !== 2) {
             $errors['version'] = ['operation_request_invalid'];
@@ -100,6 +111,9 @@ final class AcceptanceOperationService
                 || ($data instanceof RunOperationData && ($data->errorCode !== $result->errorCode
                     || ! $this->matchesRequestedIdentity($data, $request)
                     || ! $this->matchesLifecycleData($data->resources, $request, $correlationId, $operationId)))
+                || ($data instanceof BatchOperationData && ($data->operationId !== $operationId
+                    || ($operation === 'acceptance.batch.start' && $data->correlationId !== $correlationId)))
+                || ($data instanceof BatchItemOperationData && $data->operationId !== $operationId)
                 || ($data instanceof TargetResourceLifecycleData
                     && (($data->primaryErrorCode ?? $data->cleanupErrorCode) !== $result->errorCode
                         || ! $this->matchesLifecycleData($data, $request, $correlationId, $operationId)))) {
@@ -137,6 +151,16 @@ final class AcceptanceOperationService
 
             return $this->finish($operation, $status, $code, $correlationId, $operationId,
                 exceptionClass: $exception::class, identityContext: $identityContext);
+        } catch (BatchExecutionException $exception) {
+            $status = in_array($exception->errorCode, [
+                'acceptance_batch_not_found', 'acceptance_batch_empty', 'acceptance_batch_conflict',
+                'acceptance_batch_transition_invalid', 'acceptance_batch_plan_changed',
+                'acceptance_attempt_not_found', 'acceptance_retry_not_safe', 'acceptance_batch_cancelled',
+                'acceptance_configuration_invalid',
+            ], true) ? 'rejected' : 'failed';
+
+            return $this->finish($operation, $status, $exception->errorCode, $correlationId, $operationId,
+                exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (Throwable) {
             return $this->finish($operation, 'failed', $this->fallback($operation), $correlationId, $operationId,
                 identityContext: $identityContext);
@@ -162,6 +186,10 @@ final class AcceptanceOperationService
             'acceptance.prerequisite.input.submit' => ['request_id', 'expected_lock_version', 'inputs'],
             'acceptance.prerequisite.approval.grant' => ['request_id', 'expected_lock_version', 'scope'],
             'acceptance.prerequisite.request.cancel' => ['request_id', 'expected_lock_version'],
+            'acceptance.batch.start' => [...$lists, 'limit', 'profile_id', 'mode', 'prerequisite_references'],
+            'acceptance.batch.resume' => ['batch_id', 'operation_id', 'expected_lock_version', 'prerequisite_references'],
+            'acceptance.batch.item.retry' => ['item_id', 'expected_lock_version'],
+            'acceptance.batch.cancel' => ['batch_id', 'operation_id', 'expected_lock_version'],
             default => [...$lists, 'limit'],
         };
         $errors = [];
@@ -188,6 +216,12 @@ final class AcceptanceOperationService
                 'inputs' => $this->validInputMap($value),
                 'scope' => is_string($value) && strlen($value) <= 64
                     && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1,
+                'mode' => is_string($value) && in_array($value, ['sync', 'async'], true),
+                'batch_id', 'item_id' => (is_int($value) && $value > 0)
+                    || (is_string($value) && ctype_digit($value) && (int) $value > 0),
+                'operation_id' => is_string($value) && OperationResult::isUuid($value),
+                'prerequisite_references' => is_array($value) && array_is_list($value)
+                    && count(array_filter($value, fn (mixed $entry): bool => $entry instanceof BatchPrerequisiteReference)) === count($value),
                 default => is_array($value) && array_is_list($value)
                     && count(array_filter($value, 'is_string')) === count($value),
             };
@@ -210,6 +244,10 @@ final class AcceptanceOperationService
             'acceptance.prerequisite.input.submit' => ['request_id', 'expected_lock_version', 'inputs'],
             'acceptance.prerequisite.approval.grant' => ['request_id', 'expected_lock_version', 'scope'],
             'acceptance.prerequisite.request.cancel' => ['request_id', 'expected_lock_version'],
+            'acceptance.batch.start' => ['profile_id', 'mode'],
+            'acceptance.batch.resume' => ['batch_id', 'operation_id', 'expected_lock_version'],
+            'acceptance.batch.item.retry' => ['item_id', 'expected_lock_version'],
+            'acceptance.batch.cancel' => ['batch_id', 'operation_id', 'expected_lock_version'],
             default => [],
         };
         foreach ($required as $field) {
@@ -264,6 +302,8 @@ final class AcceptanceOperationService
             'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import' => 'target_module_generation_failed',
             'acceptance.prerequisite.request.prepare', 'acceptance.prerequisite.input.submit',
             'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel' => 'prerequisite_persistence_failed',
+            'acceptance.batch.start', 'acceptance.batch.resume', 'acceptance.batch.item.retry',
+            'acceptance.batch.cancel' => 'acceptance_execution_persistence_failed',
             default => 'acceptance_catalog_failed',
         };
     }
@@ -366,6 +406,8 @@ final class AcceptanceOperationService
             'acceptance.app.validate' => $data instanceof TargetModuleValidationData,
             'acceptance.prerequisite.request.prepare', 'acceptance.prerequisite.input.submit',
             'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel' => $data instanceof PrerequisiteOperationData,
+            'acceptance.batch.start', 'acceptance.batch.resume', 'acceptance.batch.cancel' => $data instanceof BatchOperationData,
+            'acceptance.batch.item.retry' => $data instanceof BatchItemOperationData,
             default => false,
         };
     }
@@ -376,7 +418,7 @@ final class AcceptanceOperationService
         ?string $code,
         string $correlationId,
         ?string $operationId,
-        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|null $data = null,
+        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|null $data = null,
         array $errors = [],
         ?string $exceptionClass = null,
         array $identityContext = [],
@@ -392,6 +434,11 @@ final class AcceptanceOperationService
             $code === 'target_not_ready' => [true, false, false],
             $code === 'fixture_setup_failed' || $code === 'cleanup_failed' => [true, false, true],
             $code === 'oracle_failed' => [false, true, false],
+            in_array($code, ['acceptance_batch_conflict', 'acceptance_attempt_stale',
+                'acceptance_batch_dispatch_failed', 'acceptance_execution_persistence_failed',
+                'acceptance_attempt_timeout'], true) => [true, false, true],
+            in_array($code, ['acceptance_batch_plan_changed', 'acceptance_batch_transition_invalid',
+                'acceptance_retry_not_safe'], true) => [false, true, true],
             in_array($code, ['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], true) => [true, false, true],
             default => [null, null, true],
         };
@@ -418,6 +465,17 @@ final class AcceptanceOperationService
             }
             $context['dry_run'] = $data->dryRun;
             $context['change_count'] = count($data->changes);
+        } elseif ($data instanceof BatchOperationData) {
+            $context['batch_id'] = $data->batchId;
+            $context['batch_state'] = $data->batchState->value;
+            $context['operation_state'] = $data->operationState->value;
+            $context['plan_fingerprint'] = $data->planFingerprint;
+        } elseif ($data instanceof BatchItemOperationData) {
+            $context['batch_id'] = $data->batchId;
+            $context['item_id'] = $data->itemId;
+            $context['attempt_id'] = $data->attemptId;
+            $context['test_id'] = $data->testId;
+            $context['item_state'] = $data->state->value;
         }
         if (in_array($exceptionClass, [AcceptanceCatalogException::class, AcceptanceRegistryException::class,
             AcceptanceExecutionException::class, TargetModuleException::class, PrerequisiteException::class], true)) {
@@ -427,6 +485,8 @@ final class AcceptanceOperationService
             Log::log($status === 'rejected' ? 'warning' : 'error', 'tms.acceptance.operation.failed', $context);
         } elseif (in_array($operation, [
             'acceptance.run', 'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import',
+            'acceptance.batch.start', 'acceptance.batch.resume', 'acceptance.batch.item.retry',
+            'acceptance.batch.cancel',
         ], true)) {
             Log::info('tms.acceptance.operation.completed', $context);
         }

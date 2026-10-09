@@ -172,7 +172,8 @@ class AcceptanceOperationServiceTest extends TestCase
     {
         $calls = 0;
         $registry = new AcceptanceOperationRegistry;
-        foreach (['acceptance.list', 'acceptance.run'] as $name) {
+        foreach (['acceptance.list', 'acceptance.run', 'acceptance.batch.start', 'acceptance.batch.resume',
+            'acceptance.batch.item.retry', 'acceptance.batch.cancel'] as $name) {
             $registry->register($name, function () use (&$calls): AcceptanceOperationHandler {
                 $calls++;
                 throw new RuntimeException('example-sensitive-value');
@@ -186,6 +187,10 @@ class AcceptanceOperationServiceTest extends TestCase
             [new OperationRequest('acceptance.list', ['limit' => 1.5]), 'operation_request_invalid', ['limit']],
             [new OperationRequest('acceptance.run'), 'operation_request_invalid', ['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key', 'profile_id']],
             [new OperationRequest('acceptance.run', [...$this->parameters(), 'profile_id' => [], 'headed' => 'yes']), 'operation_request_invalid', ['profile_id', 'headed']],
+            [new OperationRequest('acceptance.batch.start', ['profile_id' => 1, 'mode' => 'parallel']), 'operation_request_invalid', ['mode']],
+            [new OperationRequest('acceptance.batch.resume', ['batch_id' => 1, 'operation_id' => 'bad', 'expected_lock_version' => 0]), 'operation_request_invalid', ['operation_id']],
+            [new OperationRequest('acceptance.batch.item.retry', ['item_id' => 0, 'expected_lock_version' => 0]), 'operation_request_invalid', ['item_id']],
+            [new OperationRequest('acceptance.batch.cancel', ['batch_id' => 1, 'operation_id' => self::UUID, 'expected_lock_version' => -1]), 'operation_request_invalid', ['expected_lock_version']],
             [new OperationRequest('acceptance.run', $this->parameters(), correlationId: 'example-sensitive-value'), 'operation_request_invalid', ['correlationId']],
         ];
 

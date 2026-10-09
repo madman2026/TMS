@@ -8,22 +8,31 @@ use App\TestStatusEnum;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\ExecutorRegistry;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
+use Modules\Core\Data\BrowserExecutorData;
+use Modules\Core\Data\ExecutorRequest;
+use Modules\Core\Data\ExecutorTraceContext;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
+use Modules\Core\Enums\ExecutorResultStatus;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
 use Modules\Core\Services\AcceptanceRunner;
 use Throwable;
 
 class AcceptanceRunService
 {
-    public function __construct(private readonly AcceptanceRunner $runner) {}
+    public function __construct(
+        private readonly AcceptanceRunner $runner,
+        private readonly ?ExecutorRegistry $executors = null,
+    ) {}
 
     public function run(
         Profile $profile,
         AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
         ?RunOptions $options = null,
+        ?ExecutorTraceContext $trace = null,
     ): Test {
         $test = $profile->tests()->create([
             'name' => $scenario->name(),
@@ -37,15 +46,55 @@ class AcceptanceRunService
         ]);
 
         try {
-            $result = $this->runner->run($identity, $scenario, $options ?? $this->defaultOptions());
+            if ($this->executors === null) {
+                $result = $this->runner->run($identity, $scenario, $options ?? $this->defaultOptions());
+            } else {
+                $request = ExecutorRequest::browser(
+                    $identity,
+                    $scenario,
+                    $options ?? $this->defaultOptions(),
+                    $this->traceWithTest($trace, (int) $test->getKey()),
+                );
+                $executorResult = $this->executors->execute($request);
+                if ($executorResult->data instanceof BrowserExecutorData) {
+                    $result = $executorResult->data;
+                } else {
+                    $test->update([
+                        'status' => TestStatusEnum::FAILED,
+                        'error_code' => $executorResult->errorCode ?? 'acceptance_command_failed',
+                        'data' => null,
+                    ]);
+
+                    return $test->refresh();
+                }
+
+                if ($executorResult->status !== ExecutorResultStatus::Succeeded && $result->passed) {
+                    $test->update([
+                        'status' => TestStatusEnum::FAILED,
+                        'error_code' => $executorResult->errorCode ?? 'acceptance_command_failed',
+                        'data' => null,
+                    ]);
+
+                    return $test->refresh();
+                }
+            }
         } catch (AcceptanceExecutionException $exception) {
             $this->recordExecutionFailure($test, $exception);
+
+            return $test->refresh();
+        } catch (Throwable $exception) {
+            $normalized = AcceptanceExecutionException::scenarioFailed($exception);
+            $this->recordExecutionFailure($test, $normalized);
 
             return $test->refresh();
         }
 
         try {
-            $this->persistResult($test, $result);
+            if ($result instanceof BrowserExecutorData) {
+                $this->persistBrowserResult($test, $result);
+            } else {
+                $this->persistResult($test, $result);
+            }
         } catch (Throwable $exception) {
             $normalized = AcceptanceExecutionException::persistenceFailed($exception);
             $this->recordPersistenceFailure($test, $normalized);
@@ -58,12 +107,22 @@ class AcceptanceRunService
 
     protected function persistResult(Test $test, RunResult $result): void
     {
+        $this->persistNormalizedResult($test, $result);
+    }
+
+    protected function persistBrowserResult(Test $test, BrowserExecutorData $result): void
+    {
+        $this->persistNormalizedResult($test, $result);
+    }
+
+    private function persistNormalizedResult(Test $test, RunResult|BrowserExecutorData $result): void
+    {
         DB::transaction(function () use ($test, $result): void {
             foreach ($result->steps as $step) {
                 $test->steps()->create([
                     'name' => $step->name,
-                    'duration' => (string) $step->duration,
-                    'description' => $step->description,
+                    'duration' => (string) ($result instanceof BrowserExecutorData ? $step->durationMs / 1000 : $step->duration),
+                    'description' => $result instanceof BrowserExecutorData ? null : $step->description,
                     'data' => null,
                     'status' => $step->passed
                         ? TestStatusEnum::FINISHED->value
@@ -80,20 +139,34 @@ class AcceptanceRunService
                         'step_name' => $step->name,
                         'error_code' => $step->errorCode,
                         'critical' => $step->critical,
-                        'exception_class' => $step->exceptionClass,
+                        'exception_class' => $result instanceof BrowserExecutorData ? null : $step->exceptionClass,
                     ]);
                 }
             }
 
             $test->update([
-                'duration' => (string) $result->duration,
+                'duration' => (string) ($result instanceof BrowserExecutorData ? $result->durationMs / 1000 : $result->duration),
                 'status' => $result->passed
                     ? TestStatusEnum::FINISHED
                     : TestStatusEnum::FAILED,
-                'error_code' => $result->errorCode,
+                'error_code' => $result instanceof BrowserExecutorData
+                    ? ($result->passed ? null : 'browser_execution_failed')
+                    : $result->errorCode,
                 'data' => null,
             ]);
         });
+    }
+
+    private function traceWithTest(?ExecutorTraceContext $trace, int $testId): ExecutorTraceContext
+    {
+        return new ExecutorTraceContext(
+            correlationId: $trace?->correlationId,
+            operationId: $trace?->operationId,
+            batchId: $trace?->batchId,
+            itemId: $trace?->itemId,
+            attemptId: $trace?->attemptId,
+            testId: $testId,
+        );
     }
 
     private function defaultOptions(): RunOptions

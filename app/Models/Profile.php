@@ -5,13 +5,14 @@ namespace App\Models;
 use App\DeviceTypeEnum;
 use App\DriverTypeEnum;
 use App\InternetSpeedEnum;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Database\Factories\ProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Profile extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProfileFactory> */
+    /** @use HasFactory<ProfileFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -19,7 +20,7 @@ class Profile extends Model
         'extra',
         'device',
         'driver',
-        'internet_speed'
+        'internet_speed',
     ];
 
     protected function casts()
@@ -36,8 +37,14 @@ class Profile extends Model
     {
         return $this->belongsTo(User::class);
     }
+
     public function tests()
     {
         return $this->hasMany(Test::class);
+    }
+
+    public function acceptanceBatches(): HasMany
+    {
+        return $this->hasMany(AcceptanceBatch::class);
     }
 }

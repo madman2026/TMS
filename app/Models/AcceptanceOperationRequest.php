@@ -61,6 +61,11 @@ final class AcceptanceOperationRequest extends Model
         return $this->hasMany(AcceptanceOperationApproval::class);
     }
 
+    public function batchItems(): HasMany
+    {
+        return $this->hasMany(AcceptanceBatchItem::class, 'acceptance_operation_request_id');
+    }
+
     protected static function newFactory(): AcceptanceOperationRequestFactory
     {
         return AcceptanceOperationRequestFactory::new();

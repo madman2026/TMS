@@ -2,6 +2,8 @@
 
 namespace App\Acceptance\Operations\Data;
 
+use App\Acceptance\Execution\Data\BatchItemOperationData;
+use App\Acceptance\Execution\Data\BatchOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use InvalidArgumentException;
@@ -30,6 +32,13 @@ final readonly class OperationResult
         'prerequisite_persistence_failed',
         'unsafe_target', 'target_not_ready', 'resource_unavailable', 'fixture_setup_failed',
         'oracle_failed', 'cleanup_failed',
+        'executor_request_invalid', 'executor_not_found', 'capability_unsupported',
+        'browser_execution_failed', 'http_transport_failed', 'unsafe_executor_result',
+        'acceptance_batch_not_found', 'acceptance_batch_empty', 'acceptance_batch_conflict',
+        'acceptance_batch_transition_invalid', 'acceptance_batch_plan_changed',
+        'acceptance_batch_dispatch_failed', 'acceptance_attempt_not_found', 'acceptance_attempt_stale',
+        'acceptance_attempt_timeout', 'acceptance_retry_not_safe', 'acceptance_batch_cancelled',
+        'acceptance_execution_persistence_failed',
     ];
 
     public const REQUEST_FIELDS = [
@@ -39,6 +48,7 @@ final readonly class OperationResult
         'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms',
         'module_name', 'dry_run', 'mappings',
         'request_id', 'expected_lock_version', 'inputs', 'scope',
+        'mode', 'prerequisite_references', 'batch_id', 'operation_id', 'item_id',
     ];
 
     public array $errors;
@@ -53,7 +63,7 @@ final readonly class OperationResult
         public ?bool $permanent = null,
         public bool $adminActionRequired = false,
         array $errors = [],
-        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|null $data = null,
+        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|null $data = null,
         public int $version = 2,
     ) {
         if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)
