@@ -1,6 +1,6 @@
 # AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011 — Operator input and approval workflow
 
-Status: `in-progress — operator approved execution on 2026-10-08`
+Status: `accepted — technical validation passed; operator accepted on 2026-10-09`
 
 Generated: `2026-10-07`
 

@@ -646,6 +646,7 @@ final class PrerequisiteService
             $request->lock_version,
             $request->expires_at->utc()->toISOString(),
             $schema->inputs,
+            $schema->approvals,
             $missingInputs,
             $facts,
             $missingApprovals,

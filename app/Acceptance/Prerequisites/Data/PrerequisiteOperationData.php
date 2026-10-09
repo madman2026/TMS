@@ -13,6 +13,9 @@ final readonly class PrerequisiteOperationData
     /** @var list<InputRequirement> */
     public array $requirements;
 
+    /** @var list<ApprovalRequirement> */
+    public array $approvalRequirements;
+
     /** @var list<string> */
     public array $missingInputKeys;
 
@@ -24,6 +27,7 @@ final readonly class PrerequisiteOperationData
 
     /**
      * @param  list<InputRequirement>  $requirements
+     * @param  list<ApprovalRequirement>  $approvalRequirements
      * @param  list<string>  $missingInputKeys
      * @param  list<ApprovalFact>  $approvalFacts
      * @param  list<string>  $missingApprovalScopes
@@ -42,6 +46,7 @@ final readonly class PrerequisiteOperationData
         public int $lockVersion,
         public string $expiresAt,
         array $requirements,
+        array $approvalRequirements,
         array $missingInputKeys,
         array $approvalFacts,
         array $missingApprovalScopes,
@@ -51,7 +56,8 @@ final readonly class PrerequisiteOperationData
         if ($version !== 1 || ! self::isUuid($requestId) || ! self::isUuid($correlationId)
             || ($profileId !== null && $profileId < 1) || $lockVersion < 0
             || preg_match('/^[a-f0-9]{64}$/D', $schemaFingerprint) !== 1
-            || ! array_is_list($requirements) || ! array_is_list($missingInputKeys)
+            || ! array_is_list($requirements) || ! array_is_list($approvalRequirements)
+            || ! array_is_list($missingInputKeys)
             || ! array_is_list($approvalFacts) || ! array_is_list($missingApprovalScopes)) {
             throw new InvalidArgumentException('prerequisite_operation_data_invalid');
         }
@@ -65,6 +71,11 @@ final readonly class PrerequisiteOperationData
         }
         foreach ($requirements as $requirement) {
             if (! $requirement instanceof InputRequirement) {
+                throw new InvalidArgumentException('prerequisite_operation_data_invalid');
+            }
+        }
+        foreach ($approvalRequirements as $requirement) {
+            if (! $requirement instanceof ApprovalRequirement) {
                 throw new InvalidArgumentException('prerequisite_operation_data_invalid');
             }
         }
@@ -84,6 +95,7 @@ final readonly class PrerequisiteOperationData
             throw new InvalidArgumentException('prerequisite_operation_data_invalid');
         }
         $this->requirements = array_values($requirements);
+        $this->approvalRequirements = array_values($approvalRequirements);
         $this->missingInputKeys = array_values($missingInputKeys);
         $this->approvalFacts = array_values($approvalFacts);
         $this->missingApprovalScopes = array_values($missingApprovalScopes);

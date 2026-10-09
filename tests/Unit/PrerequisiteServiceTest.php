@@ -60,6 +60,56 @@ class PrerequisiteServiceTest extends TestCase
         );
     }
 
+    public function test_schema_rejects_duplicate_unknown_and_inapplicable_constraints(): void
+    {
+        $invalidSchemas = [
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('duplicate', InputType::STRING),
+                new InputRequirement('duplicate', InputType::STRING),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [], [
+                new ApprovalRequirement('duplicate'),
+                new ApprovalRequirement('duplicate'),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [], [
+                new ApprovalRequirement('deploy', invalidatedByInputKeys: ['missing']),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('username', InputType::STRING),
+            ], [
+                new ApprovalRequirement('deploy', invalidatedByInputKeys: ['username']),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', approvals: [
+                new ApprovalRequirement('deploy', ttlSeconds: 301),
+            ], requestTtlSeconds: 300),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('enabled', InputType::BOOLEAN, minimum: 1),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('mode', InputType::STRING, allowedValues: []),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('mode', InputType::STRING, allowedValues: ['same', 'same']),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('count', InputType::INTEGER, minimum: 2, maximum: 1),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('name', InputType::STRING, listLimit: 1),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('Invalid Version'),
+        ];
+
+        foreach ($invalidSchemas as $schema) {
+            try {
+                $schema();
+                $this->fail('Expected invalid prerequisite schema.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame('prerequisite_schema_invalid', $exception->getMessage());
+            }
+        }
+    }
+
     public function test_variant_uses_one_deterministic_empty_schema_when_omitted(): void
     {
         $first = new VariantDescriptor('default');
@@ -245,6 +295,96 @@ class PrerequisiteServiceTest extends TestCase
         $this->assertSame(PrerequisiteState::AWAITING_APPROVAL, $expiredApproval->state);
         $this->assertSame(['deploy'], $expiredApproval->missingApprovalScopes);
         $this->assertSame($ready->lockVersion + 1, $expiredApproval->lockVersion);
+    }
+
+    public function test_initial_state_shortcuts_cancellation_and_expiry_cover_every_prerequisite_state(): void
+    {
+        $this->travelTo('2026-10-08 12:00:00');
+        $profile = Profile::factory()->for(User::factory())->create();
+        $correlationId = (string) Str::uuid();
+
+        [$readyService] = $this->service(new PrerequisiteSchema('ready-v1', requestTtlSeconds: 300));
+        $ready = $readyService->prepare(
+            $this->identity(),
+            $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $this->assertSame(PrerequisiteState::READY, $ready->state);
+
+        [$approvalService] = $this->service(new PrerequisiteSchema('approval-v1', approvals: [
+            new ApprovalRequirement('deploy', ttlSeconds: 300),
+        ], requestTtlSeconds: 300));
+        $awaitingApproval = $approvalService->prepare(
+            $this->identity(),
+            $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $this->assertSame(PrerequisiteState::AWAITING_APPROVAL, $awaitingApproval->state);
+
+        [$inputService] = $this->service(new PrerequisiteSchema('input-v1', [
+            new InputRequirement('enabled', InputType::BOOLEAN),
+        ], requestTtlSeconds: 300));
+        $awaitingInput = $inputService->prepare(
+            $this->identity(),
+            $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $inputReady = $inputService->submit($awaitingInput->requestId, 0, [
+            'enabled' => ['source' => 'literal', 'value' => true],
+        ], $correlationId, 'test.submit');
+        $this->assertSame(PrerequisiteState::READY, $inputReady->state);
+
+        $cancelledApproval = $approvalService->cancel(
+            $awaitingApproval->requestId,
+            $awaitingApproval->lockVersion,
+            $correlationId,
+            'test.cancel',
+        );
+        $this->assertSame(PrerequisiteState::CANCELLED, $cancelledApproval->state);
+        $this->assertPrerequisiteCode('invalid_transition', fn () => $approvalService->approve(
+            $cancelledApproval->requestId,
+            $cancelledApproval->lockVersion,
+            'deploy',
+            $correlationId,
+            'test.approve',
+        ));
+
+        $readyForExpiry = $readyService->prepare(
+            $this->identity(),
+            $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $approvalForExpiry = $approvalService->prepare(
+            $this->identity(),
+            $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $this->travel(300)->seconds();
+
+        $this->assertSame(
+            PrerequisiteState::EXPIRED,
+            $readyService->discover($readyForExpiry->requestId, $correlationId, 'test.prepare')->state,
+        );
+        $this->assertSame(
+            PrerequisiteState::EXPIRED,
+            $approvalService->discover($approvalForExpiry->requestId, $correlationId, 'test.prepare')->state,
+        );
+        $this->assertPrerequisiteCode('request_expired', fn () => $readyService->cancel(
+            $readyForExpiry->requestId,
+            $readyForExpiry->lockVersion,
+            $correlationId,
+            'test.cancel',
+        ));
     }
 
     /** @return array{PrerequisiteService, AcceptanceComponentProvider} */

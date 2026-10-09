@@ -25,6 +25,7 @@ use App\Models\AcceptanceOperationRequest;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\AcceptanceAppRegistry;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\LogManager;
@@ -57,6 +58,19 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         $this->assertInstanceOf(PrerequisiteOperationData::class, $prepared->data);
         $this->assertSame($prepared->operationId, $prepared->data->requestId);
         $this->assertSame(PrerequisiteState::AWAITING_INPUT, $prepared->data->state);
+        $this->assertSame(['username', 'credential'], array_map(
+            fn (InputRequirement $requirement): string => $requirement->key,
+            $prepared->data->requirements,
+        ));
+        $this->assertSame(['deploy'], array_map(
+            fn (ApprovalRequirement $requirement): string => $requirement->scope,
+            $prepared->data->approvalRequirements,
+        ));
+        $this->assertSame(3600, $prepared->data->approvalRequirements[0]->ttlSeconds);
+        $this->assertSame(
+            ['username', 'credential'],
+            $prepared->data->approvalRequirements[0]->invalidatedByInputKeys,
+        );
 
         $this->app->forgetInstance(AcceptanceOperationService::class);
         $restored = $this->app->make(AcceptanceOperationService::class)->execute(new OperationRequest(
@@ -76,6 +90,7 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         ]));
         $this->assertSame(PrerequisiteState::AWAITING_APPROVAL, $submitted->data->state);
         $this->assertSame(1, $submitted->data->lockVersion);
+        $this->assertStringNotContainsString('operator-a', print_r($submitted->data, true));
         $this->assertStringNotContainsString('app-secret://app-a/reference-a', print_r($submitted->data, true));
         $username = AcceptanceOperationInput::query()->where('key', 'username')->firstOrFail();
         $credential = AcceptanceOperationInput::query()->where('key', 'credential')->firstOrFail();
@@ -130,7 +145,10 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         $this->assertContains('acceptance_request_profile_index', $requestIndexes);
         $this->assertContains('acceptance_request_state_expiry_index', $requestIndexes);
         $this->assertContains('acceptance_input_request_key_schema_unique', $inputIndexes);
+        $this->assertContains('acceptance_input_request_key_index', $inputIndexes);
         $this->assertContains('acceptance_approval_request_scope_schema_fingerprint_unique', $approvalIndexes);
+        $this->assertContains('acceptance_approval_request_scope_revoked_index', $approvalIndexes);
+        $this->assertContains('acceptance_operation_approvals_expires_at_index', $approvalIndexes);
 
         $inputForeign = DB::select("PRAGMA foreign_key_list('acceptance_operation_inputs')")[0];
         $approvalForeign = DB::select("PRAGMA foreign_key_list('acceptance_operation_approvals')")[0];
@@ -143,6 +161,7 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         $this->assertSame('CASCADE', $inputForeign->on_update);
         $this->assertSame('acceptance_operation_requests', $approvalForeign->table);
         $this->assertSame('RESTRICT', $approvalForeign->on_delete);
+        $this->assertSame('CASCADE', $approvalForeign->on_update);
 
         $request = AcceptanceOperationRequest::query()->findOrFail($result->data->requestId);
         $this->assertSame(PrerequisiteState::AWAITING_INPUT, $request->state);
@@ -156,6 +175,87 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         } catch (QueryException) {
             $this->assertDatabaseHas('profiles', ['id' => $profile->getKey()]);
         }
+    }
+
+    public function test_model_casts_relationships_uniques_and_history_restrictions_match_the_contract(): void
+    {
+        $this->travelTo('2026-10-08 11:00:00');
+        $this->registerProvider($this->schema());
+        $profile = Profile::factory()->for(User::factory())->create();
+        $service = $this->app->make(AcceptanceOperationService::class);
+        $prepared = $service->execute(new OperationRequest('acceptance.prerequisite.request.prepare', [
+            ...$this->identity(),
+            'profile_id' => $profile->getKey(),
+        ]));
+        $submitted = $service->execute(new OperationRequest('acceptance.prerequisite.input.submit', [
+            'request_id' => $prepared->data->requestId,
+            'expected_lock_version' => 0,
+            'inputs' => [
+                'username' => ['source' => 'literal', 'value' => 'operator-a'],
+                'credential' => ['source' => 'secret_reference', 'value' => 'app-secret://app-a/reference-a'],
+            ],
+        ]));
+        $service->execute(new OperationRequest('acceptance.prerequisite.approval.grant', [
+            'request_id' => $prepared->data->requestId,
+            'expected_lock_version' => $submitted->data->lockVersion,
+            'scope' => 'deploy',
+        ]));
+
+        $request = AcceptanceOperationRequest::query()->findOrFail($prepared->data->requestId);
+        $input = $request->inputs()->where('key', 'username')->firstOrFail();
+        $approval = $request->approvals()->firstOrFail();
+
+        $this->assertSame(PrerequisiteState::READY, $request->state);
+        $this->assertInstanceOf(CarbonImmutable::class, $request->expires_at);
+        $this->assertSame(InputType::STRING, $input->type);
+        $this->assertSame(InputSensitivity::NON_SENSITIVE, $input->sensitivity);
+        $this->assertSame('operator-a', $input->value_json);
+        $this->assertInstanceOf(CarbonImmutable::class, $input->submitted_at);
+        $this->assertInstanceOf(CarbonImmutable::class, $approval->approved_at);
+        $this->assertInstanceOf(CarbonImmutable::class, $approval->expires_at);
+        $this->assertTrue($input->request->is($request));
+        $this->assertTrue($approval->request->is($request));
+        $this->assertTrue($request->profile->is($profile));
+        $this->assertCount(2, $request->inputs);
+        $this->assertCount(1, $request->approvals);
+
+        try {
+            AcceptanceOperationInput::query()->create($input->only($input->getFillable()));
+            $this->fail('Expected unique input identity constraint.');
+        } catch (QueryException) {
+            $this->assertSame(2, AcceptanceOperationInput::query()->count());
+        }
+        try {
+            AcceptanceOperationApproval::query()->create($approval->only($approval->getFillable()));
+            $this->fail('Expected unique approval identity constraint.');
+        } catch (QueryException) {
+            $this->assertSame(1, AcceptanceOperationApproval::query()->count());
+        }
+        try {
+            $request->delete();
+            $this->fail('Expected prerequisite history to restrict request deletion.');
+        } catch (QueryException) {
+            $this->assertDatabaseHas('acceptance_operation_requests', ['id' => $request->getKey()]);
+        }
+    }
+
+    public function test_prerequisite_migrations_roll_back_in_dependency_order(): void
+    {
+        $approvalMigration = require database_path('migrations/2026_10_08_000004_create_acceptance_operation_approvals_table.php');
+        $inputMigration = require database_path('migrations/2026_10_08_000003_create_acceptance_operation_inputs_table.php');
+        $requestMigration = require database_path('migrations/2026_10_08_000002_create_acceptance_operation_requests_table.php');
+
+        $approvalMigration->down();
+        $this->assertFalse(Schema::hasTable('acceptance_operation_approvals'));
+        $this->assertTrue(Schema::hasTable('acceptance_operation_inputs'));
+        $this->assertTrue(Schema::hasTable('acceptance_operation_requests'));
+
+        $inputMigration->down();
+        $this->assertFalse(Schema::hasTable('acceptance_operation_inputs'));
+        $this->assertTrue(Schema::hasTable('acceptance_operation_requests'));
+
+        $requestMigration->down();
+        $this->assertFalse(Schema::hasTable('acceptance_operation_requests'));
     }
 
     public function test_literal_secret_rejection_returns_safe_classification_and_never_leaks_the_sentinel(): void
