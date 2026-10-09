@@ -8,6 +8,7 @@ final class PrerequisiteException extends RuntimeException
 {
     private const CODES = [
         'prerequisite_request_not_found',
+        'prerequisite_request_mismatch',
         'prerequisite_schema_invalid',
         'input_required',
         'approval_required',

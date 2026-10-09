@@ -19,6 +19,13 @@ use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Targets\Data\CleanupResult;
+use App\Acceptance\Targets\Data\ResourceReference;
+use App\Acceptance\Targets\Data\TargetEnvironment;
+use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use App\Acceptance\Targets\Data\TargetOracleResult;
+use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use App\Data\AcceptancePlan;
 use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
@@ -74,6 +81,14 @@ class AcceptanceOperationServiceTest extends TestCase
         $this->assertSame('succeeded', $current->status);
         $this->assertSame(2, $current->version);
         $this->assertSame(1, $calls);
+
+        $linked = $service->execute(new OperationRequest('acceptance.run', [
+            ...$this->parameters(),
+            'request_id' => self::UUID,
+        ]));
+        $this->assertSame('succeeded', $linked->status);
+        $this->assertSame(self::UUID, $linked->data->resources->prerequisiteRequestId);
+        $this->assertSame(2, $calls);
     }
 
     public function test_run_requires_every_tuple_key_and_rejects_invalid_identity_before_factory_resolution(): void
@@ -217,6 +232,7 @@ class AcceptanceOperationServiceTest extends TestCase
             {
                 return new OperationResult($this->name(), 'succeeded', null, $correlationId, $operationId, data: new RunOperationData(
                     TestStatusEnum::FINISHED, 10, 'app-a', 'component-other', 'suite-a', 'scenario-a', 'variant-a', null,
+                    operationServiceLifecycle($correlationId, $operationId, componentKey: 'component-other'),
                 ));
             }
         };
@@ -238,13 +254,17 @@ class AcceptanceOperationServiceTest extends TestCase
                 'target_module_exists', 'target_module_path_collision', 'acceptance_source_mapping_invalid',
                 'acceptance_source_mapping_duplicate', 'prerequisite_request_not_found', 'input_required',
                 'approval_required', 'input_invalid', 'secret_literal_forbidden', 'approval_stale',
-                'request_expired', 'invalid_transition'], 'rejected', [false, true, false]],
+                'request_expired', 'invalid_transition', 'prerequisite_request_mismatch',
+                'target_not_ready'], 'rejected', [false, true, false]],
+            [['unsafe_target', 'resource_unavailable'], 'rejected', [false, true, true]],
             [['operation_registry_invalid', 'acceptance_registry_invalid', 'acceptance_registry_duplicate',
                 'acceptance_catalog_invalid', 'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
                 'target_module_path_invalid', 'prerequisite_schema_invalid', 'schema_changed'], 'failed', [false, true, true]],
             [['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], 'failed', [false, true, false]],
             [['acceptance_catalog_changed', 'conflict'], 'failed', [true, false, false]],
             [['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], 'failed', [true, false, true]],
+            [['fixture_setup_failed', 'cleanup_failed'], 'failed', [true, false, true]],
+            [['oracle_failed'], 'failed', [false, true, false]],
             [['acceptance_catalog_failed', 'acceptance_command_failed', 'target_module_generation_failed',
                 'target_module_validation_failed', 'prerequisite_persistence_failed', null], 'failed', [null, null, true]],
         ];
@@ -346,7 +366,8 @@ class AcceptanceOperationServiceTest extends TestCase
         $callbacks = [
             fn ($request, $correlation): OperationResult => new OperationResult('acceptance.list', 'succeeded', null, $correlation),
             fn ($request, $correlation): OperationResult => new OperationResult('acceptance.list', 'succeeded', null, $correlation,
-                data: new RunOperationData(TestStatusEnum::FINISHED, 7, 'app-a', 'component-a', 'suite-a', 'scenario-a', 'variant-a', null)),
+                data: new RunOperationData(TestStatusEnum::FINISHED, 7, 'app-a', 'component-a', 'suite-a', 'scenario-a', 'variant-a', null,
+                    operationServiceLifecycle($correlation, self::UUID))),
         ];
         foreach ($callbacks as $callback) {
             $result = $this->serviceFor('acceptance.list', $callback)->execute(new OperationRequest('acceptance.list'));
@@ -439,6 +460,11 @@ class AcceptanceOperationServiceTest extends TestCase
                     'scenario-a',
                     'variant-a',
                     null,
+                    operationServiceLifecycle(
+                        $correlationId,
+                        $operationId,
+                        requestId: $request->parameters['request_id'] ?? null,
+                    ),
                 );
 
                 return new OperationResult($this->name(), 'succeeded', null, $correlationId, $operationId, data: $data);
@@ -457,4 +483,34 @@ class AcceptanceOperationServiceTest extends TestCase
             'profile_id' => 1,
         ];
     }
+}
+
+function operationServiceLifecycle(
+    string $correlationId,
+    ?string $lifecycleId,
+    string $componentKey = 'component-a',
+    ?string $requestId = null,
+): TargetResourceLifecycleData {
+    $reference = new ResourceReference('account', 'opaque-a');
+
+    return new TargetResourceLifecycleData(
+        $lifecycleId ?? 'dcb1cf9d-207c-4a44-963b-000000000009',
+        $correlationId,
+        $requestId,
+        'app-a',
+        $componentKey,
+        'suite-a',
+        'scenario-a',
+        'variant-a',
+        1,
+        'succeeded',
+        'complete',
+        TargetReadinessResult::ready(TargetEnvironment::TESTING),
+        [$reference],
+        TargetExecutionOutcome::succeeded(),
+        TargetOracleResult::passed(),
+        CleanupResult::success([$reference]),
+        null,
+        null,
+    );
 }

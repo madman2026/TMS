@@ -8,6 +8,22 @@ use App\Acceptance\Operations\Data\CatalogOperationData;
 use App\Acceptance\Operations\Data\OperationRequest;
 use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
+use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetCleanup;
+use App\Acceptance\Targets\Contracts\TargetFixtureManager;
+use App\Acceptance\Targets\Contracts\TargetOracle;
+use App\Acceptance\Targets\Contracts\TargetReadinessProbe;
+use App\Acceptance\Targets\Data\CleanupResult;
+use App\Acceptance\Targets\Data\ResourceProvisionResult;
+use App\Acceptance\Targets\Data\ResourceReference;
+use App\Acceptance\Targets\Data\TargetContext;
+use App\Acceptance\Targets\Data\TargetEnvironment;
+use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use App\Acceptance\Targets\Data\TargetOracleResult;
+use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetResourceAdapters;
+use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
 use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
@@ -172,6 +188,10 @@ class AcceptanceOperationCommandContractTest extends TestCase
         );
         $this->assertSame('succeeded', $direct->status);
         $this->assertInstanceOf(RunOperationData::class, $direct->data);
+        $this->assertSame('succeeded', $direct->data->resources->status);
+        $this->assertSame('complete', $direct->data->resources->stage);
+        $this->assertSame($direct->operationId, $direct->data->resources->lifecycleId);
+        $this->assertSame($direct->correlationId, $direct->data->resources->correlationId);
 
         $this->assertSame(0, Artisan::call('acceptance:run', [
             'app' => 'app-a',
@@ -289,7 +309,42 @@ class AcceptanceOperationCommandContractTest extends TestCase
         $registry = new AcceptanceAppRegistry;
         $registry->register($provider);
         $this->app->instance(AcceptanceAppRegistry::class, $registry);
+        $this->registerTargetAdapters();
 
         return [$provider, $scenario];
+    }
+
+    private function registerTargetAdapters(): void
+    {
+        $adapter = new class implements TargetAccountResolver, TargetCleanup, TargetFixtureManager, TargetOracle, TargetReadinessProbe
+        {
+            public function probe(TargetContext $context): TargetReadinessResult
+            {
+                return TargetReadinessResult::ready(TargetEnvironment::TESTING);
+            }
+
+            public function resolve(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                return ResourceProvisionResult::success([new ResourceReference('account', 'opaque-a')]);
+            }
+
+            public function provision(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                return ResourceProvisionResult::success([]);
+            }
+
+            public function evaluate(TargetContext $context, TargetExecutionOutcome $execution): TargetOracleResult
+            {
+                return TargetOracleResult::passed();
+            }
+
+            public function cleanup(TargetContext $context, int $timeoutMs): CleanupResult
+            {
+                return CleanupResult::success($context->references);
+            }
+        };
+        $registry = new TargetResourceRegistry;
+        $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
+        $this->app->instance(TargetResourceRegistry::class, $registry);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Acceptance\Operations\Data;
 
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use InvalidArgumentException;
 
 /** Safe semantic result; no transport schema, human message or serializer. */
@@ -23,9 +24,12 @@ final readonly class OperationResult
         'acceptance_source_mapping_invalid', 'acceptance_source_mapping_duplicate',
         'target_module_generation_failed', 'target_module_validation_failed',
         'prerequisite_request_not_found', 'prerequisite_schema_invalid', 'input_required',
+        'prerequisite_request_mismatch',
         'approval_required', 'schema_changed', 'input_invalid', 'secret_literal_forbidden',
         'approval_stale', 'request_expired', 'invalid_transition', 'conflict',
         'prerequisite_persistence_failed',
+        'unsafe_target', 'target_not_ready', 'resource_unavailable', 'fixture_setup_failed',
+        'oracle_failed', 'cleanup_failed',
     ];
 
     public const REQUEST_FIELDS = [
@@ -49,7 +53,7 @@ final readonly class OperationResult
         public ?bool $permanent = null,
         public bool $adminActionRequired = false,
         array $errors = [],
-        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|null $data = null,
+        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|null $data = null,
         public int $version = 2,
     ) {
         if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)

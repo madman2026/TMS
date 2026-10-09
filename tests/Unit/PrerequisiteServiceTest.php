@@ -387,6 +387,53 @@ class PrerequisiteServiceTest extends TestCase
         ));
     }
 
+    public function test_execution_data_reconstructs_only_ready_ordered_values_and_secret_references(): void
+    {
+        [$service] = $this->service($this->schema());
+        $profile = Profile::factory()->for(User::factory())->create();
+        $requestId = (string) Str::uuid();
+        $correlationId = (string) Str::uuid();
+        $service->prepare($this->identity(), $profile->getKey(), $correlationId, $requestId, 'test.prepare');
+        $submitted = $service->submit($requestId, 0, [
+            'tags' => ['source' => 'literal', 'value' => ['safe']],
+            'username' => ['source' => 'literal', 'value' => 'operator-a'],
+            'enabled' => ['source' => 'literal', 'value' => true],
+            'credential' => ['source' => 'secret_reference', 'value' => 'app-secret://app-a/account-a'],
+        ], $correlationId, 'test.submit');
+        $service->approve($requestId, $submitted->lockVersion, 'deploy', $correlationId, 'test.approve');
+
+        $data = $service->executionData(
+            $this->identity(), $profile->getKey(), $requestId, $correlationId, 'acceptance.run',
+        );
+
+        $this->assertSame(['enabled', 'tags', 'username'], array_keys($data->nonSensitiveInputs));
+        $this->assertSame('operator-a', $data->nonSensitiveInputs['username']);
+        $this->assertSame(
+            ['credential' => 'app-secret://app-a/account-a'],
+            $data->secretReferences,
+        );
+        $this->assertPrerequisiteCode('prerequisite_request_mismatch', fn () => $service->executionData(
+            $this->identity(), $profile->getKey() + 1, $requestId, $correlationId, 'acceptance.run',
+        ));
+    }
+
+    public function test_execution_data_requires_a_request_only_when_the_variant_has_requirements(): void
+    {
+        [$required] = $this->service($this->schema());
+        $this->assertPrerequisiteCode('input_required', fn () => $required->executionData(
+            $this->identity(), 1, null, (string) Str::uuid(), 'acceptance.run',
+        ));
+
+        [$empty] = $this->service(new PrerequisiteSchema('none-v1'));
+        $data = $empty->executionData(
+            $this->identity(), 1, null, (string) Str::uuid(), 'acceptance.run',
+        );
+
+        $this->assertNull($data->requestId);
+        $this->assertSame([], $data->nonSensitiveInputs);
+        $this->assertSame([], $data->secretReferences);
+    }
+
     /** @return array{PrerequisiteService, AcceptanceComponentProvider} */
     private function service(PrerequisiteSchema $schema): array
     {

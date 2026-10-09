@@ -5,15 +5,32 @@ namespace Tests\Feature;
 use App\Acceptance\Operations\AcceptanceOperationRegistry;
 use App\Acceptance\Operations\AcceptanceOperationService;
 use App\Acceptance\Operations\Data\OperationRequest;
+use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Prerequisites\Contracts\OperatorContextProvider;
 use App\Acceptance\Prerequisites\Data\ApprovalRequirement;
 use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputType;
 use App\Acceptance\Prerequisites\Enums\PrerequisiteState;
+use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetCleanup;
+use App\Acceptance\Targets\Contracts\TargetFixtureManager;
+use App\Acceptance\Targets\Contracts\TargetOracle;
+use App\Acceptance\Targets\Contracts\TargetReadinessProbe;
+use App\Acceptance\Targets\Data\CleanupResult;
+use App\Acceptance\Targets\Data\ResourceProvisionResult;
+use App\Acceptance\Targets\Data\ResourceReference;
+use App\Acceptance\Targets\Data\TargetContext;
+use App\Acceptance\Targets\Data\TargetEnvironment;
+use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use App\Acceptance\Targets\Data\TargetOracleResult;
+use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetResourceAdapters;
+use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
 use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
@@ -25,6 +42,8 @@ use App\Models\AcceptanceOperationRequest;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\AcceptanceAppRegistry;
+use App\Services\AcceptanceRunService;
+use App\TestStatusEnum;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,6 +53,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
@@ -374,6 +394,92 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         )->once();
     }
 
+    public function test_ready_execution_data_reaches_only_resource_adapters_and_never_operation_output_or_logs(): void
+    {
+        $this->registerProvider($this->schema());
+        $profile = Profile::factory()->for(User::factory())->create();
+        $service = $this->app->make(AcceptanceOperationService::class);
+        $prepared = $service->execute(new OperationRequest('acceptance.prerequisite.request.prepare', [
+            ...$this->identity(),
+            'profile_id' => $profile->getKey(),
+        ]));
+        $submitted = $service->execute(new OperationRequest('acceptance.prerequisite.input.submit', [
+            'request_id' => $prepared->data->requestId,
+            'expected_lock_version' => 0,
+            'inputs' => [
+                'username' => ['source' => 'literal', 'value' => 'operator-a'],
+                'credential' => ['source' => 'secret_reference', 'value' => 'app-secret://app-a/reference-a'],
+            ],
+        ]));
+        $service->execute(new OperationRequest('acceptance.prerequisite.approval.grant', [
+            'request_id' => $prepared->data->requestId,
+            'expected_lock_version' => $submitted->data->lockVersion,
+            'scope' => 'deploy',
+        ]));
+
+        $adapter = new class implements TargetAccountResolver, TargetCleanup, TargetFixtureManager, TargetOracle, TargetReadinessProbe
+        {
+            public ?PrerequisiteExecutionData $received = null;
+
+            public function probe(TargetContext $context): TargetReadinessResult
+            {
+                return TargetReadinessResult::ready(TargetEnvironment::STAGING);
+            }
+
+            public function resolve(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                $this->received = $prerequisites;
+
+                return ResourceProvisionResult::success([new ResourceReference('account', 'opaque-a')]);
+            }
+
+            public function provision(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                return ResourceProvisionResult::success([]);
+            }
+
+            public function evaluate(TargetContext $context, TargetExecutionOutcome $execution): TargetOracleResult
+            {
+                return TargetOracleResult::passed();
+            }
+
+            public function cleanup(TargetContext $context, int $timeoutMs): CleanupResult
+            {
+                return CleanupResult::success($context->references);
+            }
+        };
+        $registry = new TargetResourceRegistry;
+        $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
+        $this->app->instance(TargetResourceRegistry::class, $registry);
+        $test = $profile->tests()->create([
+            'name' => 'Scenario A',
+            ...$this->identity(),
+            'status' => TestStatusEnum::FINISHED,
+        ]);
+        $runService = Mockery::mock(AcceptanceRunService::class);
+        $runService->shouldReceive('run')->once()->andReturn($test);
+        $this->app->instance(AcceptanceRunService::class, $runService);
+        Log::swap(Mockery::spy(LogManager::class));
+
+        $result = $service->execute(new OperationRequest('acceptance.run', [
+            ...$this->identity(),
+            'profile_id' => $profile->getKey(),
+            'request_id' => $prepared->data->requestId,
+        ]));
+
+        $this->assertSame('succeeded', $result->status);
+        $this->assertInstanceOf(RunOperationData::class, $result->data);
+        $this->assertSame('operator-a', $adapter->received?->nonSensitiveInputs['username']);
+        $this->assertSame('app-secret://app-a/reference-a', $adapter->received?->secretReferences['credential']);
+        $this->assertStringNotContainsString('operator-a', print_r($result, true));
+        $this->assertStringNotContainsString('app-secret://', print_r($result, true));
+        Log::shouldHaveReceived('info')->once()->withArgs(
+            fn (string $event, array $context): bool => $event === 'tms.acceptance.operation.completed'
+                && ! str_contains(print_r($context, true), 'operator-a')
+                && ! str_contains(print_r($context, true), 'app-secret://'),
+        );
+    }
+
     private function registerProvider(PrerequisiteSchema $schema): void
     {
         $this->app->instance(OperatorContextProvider::class, new class implements OperatorContextProvider
@@ -383,9 +489,36 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
                 return new OperatorContext('test_actor', 'test-actor');
             }
         });
-        $this->app->make(AcceptanceAppRegistry::class)->register(new class($schema) implements AcceptanceComponentProvider
+        $scenario = new class implements AcceptanceScenario
         {
-            public function __construct(private readonly PrerequisiteSchema $schema) {}
+            public function key(): string
+            {
+                return 'scenario-a';
+            }
+
+            public function name(): string
+            {
+                return 'Scenario A';
+            }
+
+            public function metadata(): ScenarioMetadata
+            {
+                return new ScenarioMetadata(
+                    ['capability-a'], ['tag-a'], AutomationDisposition::AUTOMATED, EvidenceMode::METADATA_ONLY,
+                );
+            }
+
+            public function steps(TestContext $context): iterable
+            {
+                return [];
+            }
+        };
+        $this->app->make(AcceptanceAppRegistry::class)->register(new class($schema, $scenario) implements AcceptanceComponentProvider
+        {
+            public function __construct(
+                private readonly PrerequisiteSchema $schema,
+                private readonly AcceptanceScenario $scenario,
+            ) {}
 
             public function key(): string
             {
@@ -435,7 +568,9 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
                 string $scenarioKey,
                 string $variantKey,
             ): ?AcceptanceScenario {
-                return null;
+                return $componentKey === 'component-a' && $suiteKey === 'suite-a'
+                    && $scenarioKey === 'scenario-a' && $variantKey === 'variant-a'
+                    ? $this->scenario : null;
             }
         });
     }

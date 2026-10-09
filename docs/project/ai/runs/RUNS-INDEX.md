@@ -10,4 +10,5 @@
 | Transport-neutral Acceptance operation layer run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-OPERATION-SERVICE-LAYER-0009-run-001.md` |
 | Nwidart target module and Component SDK run 001 | accepted | accepted — operator accepted 2026-10-08 | `docs/project/ai/runs/AI-PACK-TMS-TARGET-MODULE-COMPONENT-SDK-0010-run-001.md` |
 | Operator input and approval workflow run 001 | accepted | accepted — operator accepted 2026-10-09 | `docs/project/ai/runs/AI-PACK-TMS-OPERATOR-INPUT-APPROVAL-0011-run-001.md` |
+| Target resource lifecycle contracts run 001 | accepted | accepted — operator accepted 2026-10-09 | `docs/project/ai/runs/AI-PACK-TMS-TARGET-RESOURCE-LIFECYCLE-0012-run-001.md` |
 | Acceptance hierarchy hard cutover remediation run 001 | accepted | accepted — operator accepted 2026-10-08 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-ACCEPTANCE-HIERARCHY-CUTOVER-0001-run-001.md` |

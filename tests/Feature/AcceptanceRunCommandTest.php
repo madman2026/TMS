@@ -2,6 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
+use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetCleanup;
+use App\Acceptance\Targets\Contracts\TargetFixtureManager;
+use App\Acceptance\Targets\Contracts\TargetOracle;
+use App\Acceptance\Targets\Contracts\TargetReadinessProbe;
+use App\Acceptance\Targets\Data\CleanupResult;
+use App\Acceptance\Targets\Data\ResourceProvisionResult;
+use App\Acceptance\Targets\Data\ResourceReference;
+use App\Acceptance\Targets\Data\TargetContext;
+use App\Acceptance\Targets\Data\TargetEnvironment;
+use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use App\Acceptance\Targets\Data\TargetOracleResult;
+use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetResourceAdapters;
+use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
 use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
@@ -118,6 +134,46 @@ class AcceptanceRunCommandTest extends TestCase
         $this->assertSame([
             ['component-a', 'suite-a', 'scenario-a', 'variant-a'],
         ], $provider->resolutions);
+    }
+
+    public function test_oracle_failure_wins_over_cleanup_failure_and_updates_the_existing_test_safely(): void
+    {
+        Log::spy();
+        $this->bindProvider(AutomationDisposition::AUTOMATED, oraclePasses: false, cleanupPasses: false);
+        $profile = $this->profile();
+        $test = $profile->tests()->create([
+            'name' => 'Scenario A',
+            ...$this->identityColumns(),
+            'status' => TestStatusEnum::FINISHED,
+        ]);
+        $service = Mockery::mock(AcceptanceRunService::class);
+        $service->shouldReceive('run')->once()->andReturn($test);
+        $this->app->instance(AcceptanceRunService::class, $service);
+
+        $this->artisan('acceptance:run', [
+            ...$this->commandIdentity(),
+            'profile' => $profile->getKey(),
+        ])->expectsOutput(json_encode([
+            'schema_version' => 2,
+            'status' => 'failed',
+            'test_id' => $test->getKey(),
+            ...$this->identityColumns(),
+            'error_code' => 'oracle_failed',
+        ], JSON_THROW_ON_ERROR))->assertExitCode(1);
+
+        $this->assertSame(TestStatusEnum::FAILED, $test->refresh()->status);
+        $this->assertSame('oracle_failed', $test->error_code);
+        Log::shouldHaveReceived('log')->once()->withArgs(function (string $level, string $message, array $context): bool {
+            $encoded = json_encode($context, JSON_THROW_ON_ERROR);
+
+            return $level === 'error'
+                && $message === 'tms.acceptance.operation.failed'
+                && $context['primary_error_code'] === 'oracle_failed'
+                && $context['cleanup_error_code'] === 'cleanup_failed'
+                && $context['resources'][0]['type'] === 'account'
+                && strlen($context['resources'][0]['reference_hash']) === 64
+                && ! str_contains($encoded, 'opaque-a');
+        });
     }
 
     public function test_omitted_runtime_options_use_configured_defaults(): void
@@ -330,8 +386,11 @@ class AcceptanceRunCommandTest extends TestCase
     }
 
     /** @return array{AcceptanceComponentProvider, AcceptanceScenario} */
-    private function bindProvider(AutomationDisposition $disposition): array
-    {
+    private function bindProvider(
+        AutomationDisposition $disposition,
+        bool $oraclePasses = true,
+        bool $cleanupPasses = true,
+    ): array {
         $metadata = new ScenarioMetadata(
             ['execution'],
             ['command'],
@@ -415,8 +474,50 @@ class AcceptanceRunCommandTest extends TestCase
         $registry = new AcceptanceAppRegistry;
         $registry->register($provider);
         $this->app->instance(AcceptanceAppRegistry::class, $registry);
+        $this->registerTargetAdapters($oraclePasses, $cleanupPasses);
 
         return [$provider, $scenario];
+    }
+
+    private function registerTargetAdapters(bool $oraclePasses, bool $cleanupPasses): void
+    {
+        $adapter = new class($oraclePasses, $cleanupPasses) implements TargetAccountResolver, TargetCleanup, TargetFixtureManager, TargetOracle, TargetReadinessProbe
+        {
+            public function __construct(
+                private readonly bool $oraclePasses,
+                private readonly bool $cleanupPasses,
+            ) {}
+
+            public function probe(TargetContext $context): TargetReadinessResult
+            {
+                return TargetReadinessResult::ready(TargetEnvironment::TESTING);
+            }
+
+            public function resolve(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                return ResourceProvisionResult::success([new ResourceReference('account', 'opaque-a')]);
+            }
+
+            public function provision(TargetContext $context, PrerequisiteExecutionData $prerequisites): ResourceProvisionResult
+            {
+                return ResourceProvisionResult::success([]);
+            }
+
+            public function evaluate(TargetContext $context, TargetExecutionOutcome $execution): TargetOracleResult
+            {
+                return $this->oraclePasses ? TargetOracleResult::passed() : TargetOracleResult::failed();
+            }
+
+            public function cleanup(TargetContext $context, int $timeoutMs): CleanupResult
+            {
+                return $this->cleanupPasses
+                    ? CleanupResult::success($context->references)
+                    : CleanupResult::failed([], $context->references);
+            }
+        };
+        $registry = new TargetResourceRegistry;
+        $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
+        $this->app->instance(TargetResourceRegistry::class, $registry);
     }
 
     private function profile(): Profile

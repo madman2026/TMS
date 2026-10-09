@@ -12,6 +12,7 @@ use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Operations\Data\TargetModuleValidationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\PrerequisiteException;
+use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
 use App\TestStatusEnum;
@@ -32,6 +33,7 @@ final class AcceptanceOperationService
         'acceptance_source_mapping_duplicate',
         'prerequisite_request_not_found', 'input_required', 'approval_required', 'input_invalid',
         'secret_literal_forbidden', 'approval_stale', 'request_expired', 'invalid_transition',
+        'prerequisite_request_mismatch', 'unsafe_target', 'target_not_ready', 'resource_unavailable',
     ];
 
     private const ADMIN_CODES = [
@@ -40,6 +42,7 @@ final class AcceptanceOperationService
         'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
         'target_module_path_invalid',
         'prerequisite_schema_invalid', 'schema_changed',
+        'unsafe_target', 'resource_unavailable',
     ];
 
     public function __construct(private readonly AcceptanceOperationRegistry $registry) {}
@@ -87,18 +90,24 @@ final class AcceptanceOperationService
                 throw new \UnexpectedValueException('operation_result_invalid');
             }
             if (($result->status === 'succeeded' && $data === null)
-                || ($result->status === 'rejected' && $data !== null)
+                || ($result->status === 'rejected' && $data !== null
+                    && ! $data instanceof TargetResourceLifecycleData)
                 || (($data instanceof CatalogOperationData || $data instanceof ModuleChangeData
                     || $data instanceof TargetModuleValidationData || $data instanceof PrerequisiteOperationData)
                     && $result->status !== 'succeeded')
                 || ($data instanceof PrerequisiteOperationData
                     && ! $this->matchesPrerequisiteData($data, $request, $correlationId, $operationId))
                 || ($data instanceof RunOperationData && ($data->errorCode !== $result->errorCode
-                    || ! $this->matchesRequestedIdentity($data, $request)))) {
+                    || ! $this->matchesRequestedIdentity($data, $request)
+                    || ! $this->matchesLifecycleData($data->resources, $request, $correlationId, $operationId)))
+                || ($data instanceof TargetResourceLifecycleData
+                    && (($data->primaryErrorCode ?? $data->cleanupErrorCode) !== $result->errorCode
+                        || ! $this->matchesLifecycleData($data, $request, $correlationId, $operationId)))) {
                 throw new \UnexpectedValueException('operation_result_invalid');
             }
             $status = $data instanceof RunOperationData
-                ? ($data->testStatus === TestStatusEnum::FINISHED ? 'succeeded' : 'failed')
+                ? ($data->testStatus === TestStatusEnum::FINISHED && $data->resources->status === 'succeeded'
+                    ? 'succeeded' : 'failed')
                 : $result->status;
 
             // Rebuild identity, classification and traces; a handler cannot replace them.
@@ -142,7 +151,7 @@ final class AcceptanceOperationService
         $lists = ['app', 'component', 'suite', 'scenario', 'variant', 'capability', 'tag', 'disposition', 'evidence_mode'];
         $allowed = match ($request->operation) {
             'acceptance.run' => ['app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key',
-                'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms'],
+                'profile_id', 'browser', 'headed', 'timeout_ms', 'slow_mo_ms', 'request_id'],
             'acceptance.app.create' => ['module_name', 'app_key', 'dry_run'],
             'acceptance.app.validate' => ['module_name'],
             'acceptance.component.create' => ['module_name', 'component_key', 'dry_run'],
@@ -268,6 +277,24 @@ final class AcceptanceOperationService
             && $data->variantKey === $request->parameters['variant_key'];
     }
 
+    private function matchesLifecycleData(
+        TargetResourceLifecycleData $data,
+        OperationRequest $request,
+        string $correlationId,
+        ?string $operationId,
+    ): bool {
+        return $operationId !== null
+            && $data->lifecycleId === $operationId
+            && $data->correlationId === $correlationId
+            && $data->prerequisiteRequestId === ($request->parameters['request_id'] ?? null)
+            && $data->appKey === $request->parameters['app_key']
+            && $data->componentKey === $request->parameters['component_key']
+            && $data->suiteKey === $request->parameters['suite_key']
+            && $data->scenarioKey === $request->parameters['scenario_key']
+            && $data->variantKey === $request->parameters['variant_key']
+            && $data->profileId === (int) $request->parameters['profile_id'];
+    }
+
     private function matchesPrerequisiteData(
         PrerequisiteOperationData $data,
         OperationRequest $request,
@@ -333,7 +360,7 @@ final class AcceptanceOperationService
         }
 
         return match ($operation) {
-            'acceptance.run' => $data instanceof RunOperationData,
+            'acceptance.run' => $data instanceof RunOperationData || $data instanceof TargetResourceLifecycleData,
             'acceptance.list', 'acceptance.plan' => $data instanceof CatalogOperationData,
             'acceptance.app.create', 'acceptance.component.create', 'acceptance.scenarios.import' => $data instanceof ModuleChangeData,
             'acceptance.app.validate' => $data instanceof TargetModuleValidationData,
@@ -349,18 +376,22 @@ final class AcceptanceOperationService
         ?string $code,
         string $correlationId,
         ?string $operationId,
-        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|null $data = null,
+        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|null $data = null,
         array $errors = [],
         ?string $exceptionClass = null,
         array $identityContext = [],
     ): OperationResult {
         [$retryable, $permanent, $admin] = match (true) {
             $status === 'succeeded' => [null, null, false],
+            in_array($code, ['unsafe_target', 'resource_unavailable'], true) => [false, true, true],
             in_array($code, self::REJECTED_CODES, true),
             in_array($code, ['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], true) => [false, true, false],
             in_array($code, self::ADMIN_CODES, true) => [false, true, true],
             $code === 'acceptance_catalog_changed' => [true, false, false],
             $code === 'conflict' => [true, false, false],
+            $code === 'target_not_ready' => [true, false, false],
+            $code === 'fixture_setup_failed' || $code === 'cleanup_failed' => [true, false, true],
+            $code === 'oracle_failed' => [false, true, false],
             in_array($code, ['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], true) => [true, false, true],
             default => [null, null, true],
         };
@@ -374,6 +405,9 @@ final class AcceptanceOperationService
         ];
         if ($data instanceof RunOperationData) {
             $context['test_id'] = $data->testId;
+            $context += $this->resourceContext($data->resources);
+        } elseif ($data instanceof TargetResourceLifecycleData) {
+            $context += $this->resourceContext($data);
         } elseif ($data instanceof ModuleChangeData) {
             $context['module_name'] = $data->moduleName;
             if ($data->appKey !== null) {
@@ -398,5 +432,25 @@ final class AcceptanceOperationService
         }
 
         return $result;
+    }
+
+    /** Include only opaque hashes and semantic lifecycle fields in operation logs. */
+    private function resourceContext(TargetResourceLifecycleData $data): array
+    {
+        return array_filter([
+            'lifecycle_id' => $data->lifecycleId,
+            'prerequisite_request_id' => $data->prerequisiteRequestId,
+            'resource_status' => $data->status,
+            'resource_stage' => $data->stage,
+            'primary_error_code' => $data->primaryErrorCode,
+            'cleanup_error_code' => $data->cleanupErrorCode,
+            'resources' => array_map(
+                fn ($reference): array => [
+                    'type' => $reference->type,
+                    'reference_hash' => $reference->referenceHash,
+                ],
+                $data->references,
+            ),
+        ], fn (mixed $value): bool => $value !== null);
     }
 }

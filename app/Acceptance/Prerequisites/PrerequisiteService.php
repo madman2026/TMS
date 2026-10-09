@@ -7,6 +7,7 @@ use App\Acceptance\Prerequisites\Data\ApprovalFact;
 use App\Acceptance\Prerequisites\Data\ApprovalRequirement;
 use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
@@ -315,6 +316,97 @@ final class PrerequisiteService
         }
 
         return $result['data'];
+    }
+
+    /** @param array{app_key: string, component_key: string, suite_key: string, scenario_key: string, variant_key: string} $identity */
+    public function executionData(
+        array $identity,
+        int $profileId,
+        ?string $requestId,
+        string $correlationId,
+        string $operation,
+    ): PrerequisiteExecutionData {
+        return $this->run(function () use ($identity, $profileId, $requestId, $correlationId, $operation): PrerequisiteExecutionData {
+            $schema = $this->schemaFor($identity);
+            if ($requestId === null) {
+                if ($this->requiredInputs($schema) !== []) {
+                    throw PrerequisiteException::because('input_required');
+                }
+                if ($this->requiredApprovals($schema) !== []) {
+                    throw PrerequisiteException::because('approval_required');
+                }
+
+                return new PrerequisiteExecutionData(
+                    null,
+                    $identity['app_key'],
+                    $identity['component_key'],
+                    $identity['suite_key'],
+                    $identity['scenario_key'],
+                    $identity['variant_key'],
+                    $profileId,
+                );
+            }
+
+            return DB::transaction(function () use ($identity, $profileId, $requestId, $correlationId, $operation): PrerequisiteExecutionData {
+                $request = $this->lockedRequest($requestId);
+                if ($request->app_key !== $identity['app_key']
+                    || $request->component_key !== $identity['component_key']
+                    || $request->suite_key !== $identity['suite_key']
+                    || $request->scenario_key !== $identity['scenario_key']
+                    || $request->variant_key !== $identity['variant_key']
+                    || $request->profile_id !== $profileId) {
+                    throw PrerequisiteException::because('prerequisite_request_mismatch');
+                }
+                $schema = $this->schemaForRequest($request);
+
+                $now = now();
+                $previous = $request->state;
+                if ($this->applyExpiryOrRecompute($request, $schema, $now)) {
+                    $this->logTransition(
+                        $request,
+                        $previous,
+                        $request->state,
+                        $operation,
+                        $correlationId,
+                        $this->operatorContext->current(),
+                    );
+                }
+                if ($request->state === PrerequisiteState::EXPIRED) {
+                    throw PrerequisiteException::because('request_expired');
+                }
+                if ($request->state === PrerequisiteState::CANCELLED) {
+                    throw PrerequisiteException::because('invalid_transition');
+                }
+                if ($request->state === PrerequisiteState::AWAITING_INPUT) {
+                    throw PrerequisiteException::because('input_required');
+                }
+                if ($request->state !== PrerequisiteState::READY) {
+                    throw PrerequisiteException::because('approval_required');
+                }
+
+                $values = [];
+                $references = [];
+                foreach ($request->inputs()->orderBy('key')->get() as $input) {
+                    if ($input->sensitivity === InputSensitivity::SECRET_REFERENCE) {
+                        $references[$input->key] = $input->secret_reference;
+                    } else {
+                        $values[$input->key] = $input->value_json;
+                    }
+                }
+
+                return new PrerequisiteExecutionData(
+                    (string) $request->getKey(),
+                    $request->app_key,
+                    $request->component_key,
+                    $request->suite_key,
+                    $request->scenario_key,
+                    $request->variant_key,
+                    $request->profile_id,
+                    $values,
+                    $references,
+                );
+            });
+        });
     }
 
     /** @template T @param callable(): T $callback @return T */
