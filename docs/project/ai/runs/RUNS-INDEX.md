@@ -16,3 +16,4 @@
 | Complete Artisan operator client run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-ARTISAN-OPERATOR-CLIENT-0015-run-001.md` |
 | Acceptance hierarchy hard cutover remediation run 001 | accepted | accepted — operator accepted 2026-10-08 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-ACCEPTANCE-HIERARCHY-CUTOVER-0001-run-001.md` |
 | Coverage merged-replacement correction run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-COVERAGE-MERGE-0002-run-001.md` |
+| DK target module and owner bootstrap run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016-run-001.md` |

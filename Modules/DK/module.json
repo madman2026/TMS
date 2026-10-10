@@ -1,0 +1,11 @@
+{
+    "name": "DK",
+    "alias": "dk",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\DK\\Providers\\DKServiceProvider"
+    ],
+    "files": []
+}

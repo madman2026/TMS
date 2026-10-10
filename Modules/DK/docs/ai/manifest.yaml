@@ -1,0 +1,32 @@
+schema_version: 1
+owner:
+  id: dk
+  name: DK
+  type: target-module
+  layer: 3
+status: active
+migration_status: bootstrap-complete-accepted
+current_documentation_entry: Modules/DK/docs/ai/README.md
+project_profile: docs/project/ai/TMS-AI-PROFILE.md
+governance_profile: Modules/DK/docs/ai/GOVERNANCE-PROFILE.md
+router: Modules/DK/AGENTS.md
+source_root: Modules/DK
+documentation_root: Modules/DK/docs/ai
+indexes:
+  canonical: Modules/DK/docs/ai/canonical/CANONICAL-INDEX.md
+  guides: Modules/DK/docs/ai/guides/GUIDES-INDEX.md
+  decisions: Modules/DK/docs/ai/decisions/DECISIONS-INDEX.md
+  changes: Modules/DK/docs/ai/changes/CHANGES-INDEX.md
+  remediations: Modules/DK/docs/ai/remediations/REMEDIATIONS-INDEX.md
+  packs: Modules/DK/docs/ai/packs/PACKS-INDEX.md
+  runs: Modules/DK/docs/ai/runs/RUNS-INDEX.md
+  reviews: Modules/DK/docs/ai/reviews/REVIEWS-INDEX.md
+  references: Modules/DK/docs/ai/references/REFERENCES-INDEX.md
+scope:
+  includes:
+    - Modules/DK
+  excludes:
+    - root-application-behavior
+    - cross-module-governance
+    - repository-lifecycle-records
+    - shared-acceptance-runtime

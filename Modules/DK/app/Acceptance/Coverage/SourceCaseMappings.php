@@ -1,0 +1,18 @@
+<?php
+
+namespace Modules\DK\Acceptance\Coverage;
+
+use App\Acceptance\Coverage\Data\SourceCaseMapping;
+use App\Acceptance\Coverage\Enums\CoverageDisposition;
+
+final class SourceCaseMappings
+{
+    /** @return list<SourceCaseMapping> */
+    public static function all(): array
+    {
+        return [
+            // <tms:source-case-mappings>
+            // </tms:source-case-mappings>
+        ];
+    }
+}

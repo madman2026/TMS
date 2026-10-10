@@ -134,6 +134,8 @@ class AcceptanceOperationCommandContractTest extends TestCase
 
     public function test_empty_catalog_versions_keep_map_shape_across_direct_and_command_boundaries(): void
     {
+        $this->app->instance(AcceptanceAppRegistry::class, new AcceptanceAppRegistry);
+
         $direct = $this->app->make(AcceptanceOperationService::class)->execute(
             new OperationRequest('acceptance.list'),
         );
