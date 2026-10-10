@@ -47,7 +47,7 @@ class AcceptanceRunCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_command_exposes_the_complete_required_tuple_and_approved_options(): void
+    public function test_command_exposes_the_complete_interactive_tuple_and_approved_options(): void
     {
         $definition = Artisan::all()['acceptance:run']->getDefinition();
 
@@ -55,11 +55,11 @@ class AcceptanceRunCommandTest extends TestCase
             ['app', 'component', 'suite', 'scenario', 'variant', 'profile'],
             array_keys($definition->getArguments()),
         );
-        foreach (['browser', 'headed', 'timeout', 'slow-mo'] as $option) {
+        foreach (['request-id', 'browser', 'headed', 'timeout', 'slow-mo', 'interactive', 'json'] as $option) {
             $this->assertTrue($definition->hasOption($option));
         }
         foreach (['app', 'component', 'suite', 'scenario', 'variant', 'profile'] as $argument) {
-            $this->assertTrue($definition->getArgument($argument)->isRequired());
+            $this->assertFalse($definition->getArgument($argument)->isRequired());
         }
         $this->assertFalse($definition->hasOption('default-variant'));
     }
@@ -356,7 +356,7 @@ class AcceptanceRunCommandTest extends TestCase
             ...$this->commandIdentity(),
             'profile' => $profile->getKey(),
             '--timeout' => '0',
-        ])->expectsOutput($this->errorJson('rejected', 'acceptance_configuration_invalid'))
+        ])->expectsOutput($this->errorJson('rejected', 'cli_input_invalid'))
             ->assertExitCode(2);
     }
 
@@ -369,15 +369,15 @@ class AcceptanceRunCommandTest extends TestCase
         $this->app->instance(AcceptanceRunService::class, $service);
 
         foreach ([
-            ['--browser' => 'unsupported'],
-            ['--timeout' => 'example-sensitive-value'],
-            ['--slow-mo' => '-1'],
-        ] as $options) {
+            [['--browser' => 'unsupported'], 'acceptance_configuration_invalid'],
+            [['--timeout' => 'example-sensitive-value'], 'cli_input_invalid'],
+            [['--slow-mo' => '-1'], 'cli_input_invalid'],
+        ] as [$options, $code]) {
             $this->artisan('acceptance:run', [
                 ...$this->commandIdentity(),
                 'profile' => $profile->getKey(),
                 ...$options,
-            ])->expectsOutput($this->errorJson('rejected', 'acceptance_configuration_invalid'))
+            ])->expectsOutput($this->errorJson('rejected', $code))
                 ->doesntExpectOutputToContain('example-sensitive-value')
                 ->assertExitCode(2);
         }

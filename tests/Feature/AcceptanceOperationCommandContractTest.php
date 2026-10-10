@@ -66,7 +66,7 @@ class AcceptanceOperationCommandContractTest extends TestCase
         );
     }
 
-    public function test_run_command_exposes_only_the_complete_hierarchy_signature(): void
+    public function test_run_command_exposes_the_complete_promptable_hierarchy_signature(): void
     {
         /** @var Command $command */
         $command = Artisan::all()['acceptance:run'];
@@ -76,7 +76,7 @@ class AcceptanceOperationCommandContractTest extends TestCase
             'app', 'component', 'suite', 'scenario', 'variant', 'profile',
         ], $arguments);
         foreach (['app', 'component', 'suite', 'scenario', 'variant', 'profile'] as $name) {
-            $this->assertTrue($command->getDefinition()->getArgument($name)->isRequired());
+            $this->assertFalse($command->getDefinition()->getArgument($name)->isRequired());
         }
     }
 

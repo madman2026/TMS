@@ -2,15 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Data\AcceptanceSelector;
-
-/** Version-2 client projection of executable hierarchy rows. */
+/** Inspect only executable acceptance hierarchy rows. */
 final class PlanAcceptanceCommand extends ListAcceptanceCommand
 {
-    protected $signature = 'acceptance:plan '.AcceptanceSelector::OPTIONS;
+    protected $signature = 'acceptance:plan '.self::SELECTOR_OPTIONS.' '.self::COMMON_OPTIONS;
 
-    protected function planning(): bool
+    protected function operation(): string
     {
-        return true;
+        return 'acceptance.plan';
     }
 }

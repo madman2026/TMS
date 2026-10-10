@@ -13,5 +13,6 @@
 | Target resource lifecycle contracts run 001 | accepted | accepted — operator accepted 2026-10-09 | `docs/project/ai/runs/AI-PACK-TMS-TARGET-RESOURCE-LIFECYCLE-0012-run-001.md` |
 | Async Queue and Bus Batch orchestration run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-ASYNC-BATCH-ORCHESTRATION-0013-run-001.md` |
 | Query, reporting, evidence, and traceability run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014-run-001.md` |
+| Complete Artisan operator client run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-ARTISAN-OPERATOR-CLIENT-0015-run-001.md` |
 | Acceptance hierarchy hard cutover remediation run 001 | accepted | accepted — operator accepted 2026-10-08 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-ACCEPTANCE-HIERARCHY-CUTOVER-0001-run-001.md` |
 | Coverage merged-replacement correction run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-COVERAGE-MERGE-0002-run-001.md` |
