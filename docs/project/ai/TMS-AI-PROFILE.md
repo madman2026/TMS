@@ -15,8 +15,9 @@ This profile binds reusable governance under `docs/ai/` to the TMS repository. I
 - Project lifecycle root: `docs/project/ai/`
 - Project references root: `docs/project/references/`
 - Module discovery: `docs/modules/MODULES-DOCS-INDEX.md`
-- Independently governed owner: Core
+- Independently governed owners: Core and DK
 - Core documentation root: `Modules/Core/docs/ai/`
+- DK documentation root: `Modules/DK/docs/ai/`
 - Module registry: `modules_statuses.json`
 
 ## Project CLI operator documentation
@@ -50,6 +51,7 @@ These bindings provide context only. They do not authorize dependency, database,
 
 - Root application behavior, repository lifecycle records, cross-module knowledge, and modules without an activated owner remain project-owned.
 - Core-specific technical and lifecycle knowledge is owner-local under `Modules/Core/docs/ai/`.
+- DK-specific technical and lifecycle knowledge is owner-local under `Modules/DK/docs/ai/`.
 - Source code remains implementation truth; accepted owner records define intended and execution truth according to shared governance.
 - Auth and Ecommerce are removed and must not be registered as active or deferred documentation owners.
 

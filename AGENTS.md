@@ -25,7 +25,7 @@ TMS uses three documentation layers:
 2. TMS-wide and cross-module knowledge and lifecycle records under `docs/project/`;
 3. owner-local knowledge and lifecycle records under an activated owner root.
 
-Core is the only activated independent module owner. Its documentation root is `Modules/Core/docs/ai/`.
+Core and DK are the activated independent module owners. Their documentation roots are `Modules/Core/docs/ai/` and `Modules/DK/docs/ai/`. Resolve the current active-owner set through `docs/modules/MODULES-DOCS-INDEX.md`.
 
 Ownership is determined from scope, audience, source of truth, consumers, and dependencies—not from folder names alone. Owner profiles overlay reusable rules; they may tighten requirements but may not disable shared safety gates, override accepted Canonical decisions, or expand Pack scope.
 
