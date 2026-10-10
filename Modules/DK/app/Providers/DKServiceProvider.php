@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\DK\Providers;
 
 use App\Acceptance\Targets\TargetResourceAdapters;
@@ -9,6 +11,12 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationAuditOracle;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationCallbackSimulator;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationProvider;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationTimeOracle;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationWorkerOracle;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Fakes\InMemoryNotificationDeliveryFake;
 use Modules\DK\Acceptance\DKAcceptanceApp;
 use Modules\DK\Acceptance\Shared\Target\DKTargetProfile;
 use Modules\DK\Acceptance\Shared\Target\DKTargetResourceAdapter;
@@ -28,6 +36,13 @@ final class DKServiceProvider extends ServiceProvider
             },
         );
         $this->app->singleton(DKTargetResourceAdapter::class);
+
+        $this->app->singleton(InMemoryNotificationDeliveryFake::class);
+        $this->app->alias(InMemoryNotificationDeliveryFake::class, NotificationProvider::class);
+        $this->app->alias(InMemoryNotificationDeliveryFake::class, NotificationCallbackSimulator::class);
+        $this->app->alias(InMemoryNotificationDeliveryFake::class, NotificationWorkerOracle::class);
+        $this->app->alias(InMemoryNotificationDeliveryFake::class, NotificationTimeOracle::class);
+        $this->app->alias(InMemoryNotificationDeliveryFake::class, NotificationAuditOracle::class);
 
         $this->app->afterResolving(
             AcceptanceAppRegistry::class,

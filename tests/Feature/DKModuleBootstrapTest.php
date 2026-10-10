@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Acceptance\Modules\TargetModuleValidator;
+use App\Data\ComponentDescriptor;
 use App\Services\AcceptanceAppRegistry;
 use App\Services\AcceptanceCatalog;
 use Modules\DK\Acceptance\DKAcceptanceApp;
@@ -22,14 +25,20 @@ class DKModuleBootstrapTest extends TestCase
         $this->assertInstanceOf(DKAcceptanceApp::class, $registry->app('dk'));
     }
 
-    public function test_dk_exposes_a_valid_empty_catalog_and_module_definition(): void
+    public function test_dk_exposes_a_valid_component_only_catalog_and_module_definition(): void
     {
         $catalog = $this->app->make(AcceptanceCatalog::class);
         $validation = $this->app->make(TargetModuleValidator::class)->validate('DK');
 
         $this->assertSame(['dk'], $catalog->appKeys());
-        $this->assertSame('v1', $catalog->version('dk'));
-        $this->assertSame([], iterator_to_array($catalog->components('dk')));
+        $this->assertSame('v2', $catalog->version('dk'));
+        $this->assertSame(
+            ['notification-delivery'],
+            array_map(
+                static fn (ComponentDescriptor $component): string => $component->key,
+                iterator_to_array($catalog->components('dk')),
+            ),
+        );
         $this->assertSame([], iterator_to_array($catalog->suites('dk')));
         $this->assertSame([], iterator_to_array($catalog->descriptors('dk')));
         $this->assertSame([], iterator_to_array($catalog->variants('dk', 'missing-scenario')));

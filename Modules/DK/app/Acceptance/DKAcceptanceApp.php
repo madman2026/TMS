@@ -16,7 +16,7 @@ final class DKAcceptanceApp implements AcceptanceCoverageProvider
 
     public function catalogVersion(): string
     {
-        return 'v1';
+        return 'v2';
     }
 
     public function components(): iterable
@@ -75,6 +75,7 @@ final class DKAcceptanceApp implements AcceptanceCoverageProvider
     {
         return [
             // <tms:components>
+            'notification-delivery' => new \Modules\DK\Acceptance\Components\NotificationDelivery\NotificationDeliveryAcceptanceComponent,
             // </tms:components>
         ];
     }

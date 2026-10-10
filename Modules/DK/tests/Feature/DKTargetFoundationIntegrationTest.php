@@ -11,6 +11,7 @@ use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use App\Acceptance\Targets\TargetResourceAdapters;
 use App\Acceptance\Targets\TargetResourceCoordinator;
 use App\Acceptance\Targets\TargetResourceRegistry;
+use App\Data\ComponentDescriptor;
 use App\Services\AcceptanceAppRegistry;
 use Illuminate\Log\LogManager;
 use Illuminate\Support\Facades\Log;
@@ -48,7 +49,13 @@ class DKTargetFoundationIntegrationTest extends TestCase
         $appRegistry = $this->app->make(AcceptanceAppRegistry::class);
         $this->assertSame(['dk'], $appRegistry->appKeys());
         $this->assertInstanceOf(DKAcceptanceApp::class, $appRegistry->app('dk'));
-        $this->assertSame([], iterator_to_array($appRegistry->app('dk')->components()));
+        $this->assertSame(
+            ['notification-delivery'],
+            array_map(
+                static fn (ComponentDescriptor $component): string => $component->key,
+                iterator_to_array($appRegistry->app('dk')->components()),
+            ),
+        );
 
         try {
             $registry->register('dk', $aggregate);
