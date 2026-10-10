@@ -19,6 +19,16 @@ use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Reporting\AcceptanceReportingException;
+use App\Acceptance\Reporting\Data\AcceptanceAttemptView;
+use App\Acceptance\Reporting\Data\AcceptanceCoverageView;
+use App\Acceptance\Reporting\Data\AcceptanceEvidenceView;
+use App\Acceptance\Reporting\Data\AcceptanceReport;
+use App\Acceptance\Reporting\Data\AcceptanceReportItem;
+use App\Acceptance\Reporting\Data\AcceptanceStatusView;
+use App\Acceptance\Reporting\Data\CoverageCounts;
+use App\Acceptance\Reporting\Data\CoverageSourceCaseView;
+use App\Acceptance\Reporting\Data\EvidenceMetadataInput;
 use App\Acceptance\Targets\Data\CleanupResult;
 use App\Acceptance\Targets\Data\ResourceReference;
 use App\Acceptance\Targets\Data\TargetEnvironment;
@@ -261,17 +271,22 @@ class AcceptanceOperationServiceTest extends TestCase
                 'approval_required', 'input_invalid', 'secret_literal_forbidden', 'approval_stale',
                 'request_expired', 'invalid_transition', 'prerequisite_request_mismatch',
                 'target_not_ready'], 'rejected', [false, true, false]],
+            [['acceptance_report_not_found', 'acceptance_report_query_invalid',
+                'acceptance_export_limit_exceeded'], 'rejected', [false, true, false]],
             [['unsafe_target', 'resource_unavailable'], 'rejected', [false, true, true]],
             [['operation_registry_invalid', 'acceptance_registry_invalid', 'acceptance_registry_duplicate',
                 'acceptance_catalog_invalid', 'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
                 'target_module_path_invalid', 'prerequisite_schema_invalid', 'schema_changed'], 'failed', [false, true, true]],
+            [['acceptance_coverage_mapping_invalid', 'acceptance_coverage_incomplete',
+                'acceptance_evidence_reference_invalid'], 'failed', [false, true, true]],
             [['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], 'failed', [false, true, false]],
             [['acceptance_catalog_changed', 'conflict'], 'failed', [true, false, false]],
             [['acceptance_browser_start_failed', 'acceptance_result_persistence_failed'], 'failed', [true, false, true]],
             [['fixture_setup_failed', 'cleanup_failed'], 'failed', [true, false, true]],
             [['oracle_failed'], 'failed', [false, true, false]],
             [['acceptance_catalog_failed', 'acceptance_command_failed', 'target_module_generation_failed',
-                'target_module_validation_failed', 'prerequisite_persistence_failed', null], 'failed', [null, null, true]],
+                'target_module_validation_failed', 'prerequisite_persistence_failed',
+                'acceptance_reporting_failed', null], 'failed', [null, null, true]],
         ];
 
         foreach ($groups as [$codes, $status, $classification]) {
@@ -297,6 +312,7 @@ class AcceptanceOperationServiceTest extends TestCase
                 new AcceptanceRegistryException('example-sensitive-code', 'example-sensitive-value'),
                 AcceptanceRegistryException::duplicate(),
                 AcceptanceCatalogException::because('acceptance_selector_invalid'),
+                AcceptanceReportingException::because('acceptance_report_query_invalid'),
             ] as $exception) {
                 Log::swap(Mockery::spy(LogManager::class));
                 $service = $this->serviceFor($operation, fn () => throw $exception);
@@ -306,6 +322,7 @@ class AcceptanceOperationServiceTest extends TestCase
                 $result = $service->execute($request);
                 $expected = match (true) {
                     $exception instanceof AcceptanceCatalogException => 'acceptance_selector_invalid',
+                    $exception instanceof AcceptanceReportingException => 'acceptance_report_query_invalid',
                     $exception instanceof AcceptanceRegistryException && $exception->errorCode === 'acceptance_registry_duplicate' => 'acceptance_registry_duplicate',
                     default => $operation === 'acceptance.run' ? 'acceptance_command_failed' : 'acceptance_catalog_failed',
                 };
@@ -337,7 +354,10 @@ class AcceptanceOperationServiceTest extends TestCase
         foreach ([OperationRequest::class, OperationResult::class, CatalogOperationData::class, RunOperationData::class,
             FileChange::class, ModuleChangeData::class, ValidationIssue::class, TargetModuleValidationData::class,
             InputRequirement::class, ApprovalRequirement::class, PrerequisiteSchema::class, OperatorContext::class,
-            ApprovalFact::class, PrerequisiteOperationData::class] as $class) {
+            ApprovalFact::class, PrerequisiteOperationData::class, EvidenceMetadataInput::class,
+            AcceptanceEvidenceView::class, AcceptanceAttemptView::class, AcceptanceReportItem::class,
+            AcceptanceStatusView::class, AcceptanceReport::class, CoverageCounts::class,
+            CoverageSourceCaseView::class, AcceptanceCoverageView::class] as $class) {
             $reflection = new ReflectionClass($class);
             $this->assertTrue($reflection->isFinal());
             $this->assertTrue($reflection->isReadOnly());

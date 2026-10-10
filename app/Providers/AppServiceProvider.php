@@ -12,6 +12,9 @@ use App\Acceptance\Operations\Handlers\CancelOperationRequest;
 use App\Acceptance\Operations\Handlers\CreateAcceptanceApp;
 use App\Acceptance\Operations\Handlers\CreateAcceptanceComponent;
 use App\Acceptance\Operations\Handlers\DiscoverOperationRequirements;
+use App\Acceptance\Operations\Handlers\GetAcceptanceReport;
+use App\Acceptance\Operations\Handlers\GetAcceptanceStatus;
+use App\Acceptance\Operations\Handlers\GetCoverageReport;
 use App\Acceptance\Operations\Handlers\ImportAcceptanceScenarios;
 use App\Acceptance\Operations\Handlers\ListAcceptanceApps;
 use App\Acceptance\Operations\Handlers\PlanAcceptance;
@@ -56,6 +59,9 @@ class AppServiceProvider extends ServiceProvider
             $registry->register('acceptance.batch.resume', fn () => $app->make(ResumeAcceptanceBatch::class));
             $registry->register('acceptance.batch.item.retry', fn () => $app->make(RetryAcceptanceBatchItem::class));
             $registry->register('acceptance.batch.cancel', fn () => $app->make(CancelAcceptanceBatch::class));
+            $registry->register('acceptance.status', fn () => $app->make(GetAcceptanceStatus::class));
+            $registry->register('acceptance.report', fn () => $app->make(GetAcceptanceReport::class));
+            $registry->register('acceptance.coverage', fn () => $app->make(GetCoverageReport::class));
 
             return $registry;
         });

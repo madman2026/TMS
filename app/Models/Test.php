@@ -6,6 +6,7 @@ use App\TestStatusEnum;
 use Database\Factories\TestFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Test extends Model
@@ -47,5 +48,17 @@ class Test extends Model
     public function acceptanceExecutionAttempt(): HasOne
     {
         return $this->hasOne(AcceptanceExecutionAttempt::class);
+    }
+
+    public function acceptanceEvidence(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            AcceptanceEvidence::class,
+            AcceptanceExecutionAttempt::class,
+            'test_id',
+            'attempt_id',
+            'id',
+            'id',
+        );
     }
 }

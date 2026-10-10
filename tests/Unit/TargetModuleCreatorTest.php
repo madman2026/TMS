@@ -68,6 +68,9 @@ class TargetModuleCreatorTest extends TestCase
         $this->assertTrue($validation->valid);
         $this->assertSame('example-app', $validation->appKey);
         $this->assertFileExists($this->root.'/ExampleTarget/app/Acceptance/ExampleTargetAcceptanceApp.php');
+        $app = $this->files->get($this->root.'/ExampleTarget/app/Acceptance/ExampleTargetAcceptanceApp.php');
+        $this->assertStringContainsString('implements AcceptanceCoverageProvider', $app);
+        $this->assertStringContainsString('yield from SourceCaseMappings::all();', $app);
         $this->assertFileExists($this->root.'/ExampleTarget/database/migrations/.gitkeep');
         $this->assertDirectoryDoesNotExist($this->root.'/ExampleTarget/routes');
         $this->assertFileDoesNotExist($this->root.'/modules_statuses.json');

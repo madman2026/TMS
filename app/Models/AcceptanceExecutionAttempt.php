@@ -7,6 +7,7 @@ use Database\Factories\AcceptanceExecutionAttemptFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class AcceptanceExecutionAttempt extends Model
 {
@@ -60,6 +61,11 @@ final class AcceptanceExecutionAttempt extends Model
     public function test(): BelongsTo
     {
         return $this->belongsTo(Test::class);
+    }
+
+    public function evidence(): HasMany
+    {
+        return $this->hasMany(AcceptanceEvidence::class, 'attempt_id');
     }
 
     protected static function newFactory(): AcceptanceExecutionAttemptFactory

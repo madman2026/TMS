@@ -17,4 +17,10 @@ return [
         'executor_timeout_ms' => (int) env('ACCEPTANCE_EXECUTOR_TIMEOUT_MS', 30_000),
         'cleanup_timeout_ms' => 30_000,
     ],
+    'reporting' => [
+        'default_page_size' => 50,
+        'max_page_size' => 250,
+        'max_export_rows' => 25_000,
+        'max_source_cases' => 25_000,
+    ],
 ];

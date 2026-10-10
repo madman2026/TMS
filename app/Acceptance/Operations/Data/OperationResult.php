@@ -5,6 +5,9 @@ namespace App\Acceptance\Operations\Data;
 use App\Acceptance\Execution\Data\BatchItemOperationData;
 use App\Acceptance\Execution\Data\BatchOperationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Reporting\Data\AcceptanceCoverageView;
+use App\Acceptance\Reporting\Data\AcceptanceReport;
+use App\Acceptance\Reporting\Data\AcceptanceStatusView;
 use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use InvalidArgumentException;
 
@@ -39,6 +42,10 @@ final readonly class OperationResult
         'acceptance_batch_dispatch_failed', 'acceptance_attempt_not_found', 'acceptance_attempt_stale',
         'acceptance_attempt_timeout', 'acceptance_retry_not_safe', 'acceptance_batch_cancelled',
         'acceptance_execution_persistence_failed',
+        'acceptance_report_not_found', 'acceptance_report_query_invalid',
+        'acceptance_coverage_mapping_invalid', 'acceptance_coverage_incomplete',
+        'acceptance_evidence_reference_invalid', 'acceptance_export_limit_exceeded',
+        'acceptance_reporting_failed',
     ];
 
     public const REQUEST_FIELDS = [
@@ -49,6 +56,7 @@ final readonly class OperationResult
         'module_name', 'dry_run', 'mappings',
         'request_id', 'expected_lock_version', 'inputs', 'scope',
         'mode', 'prerequisite_references', 'batch_id', 'operation_id', 'item_id',
+        'after_item_id', 'after_source_case_id',
     ];
 
     public array $errors;
@@ -63,7 +71,7 @@ final readonly class OperationResult
         public ?bool $permanent = null,
         public bool $adminActionRequired = false,
         array $errors = [],
-        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|null $data = null,
+        public CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|AcceptanceStatusView|AcceptanceReport|AcceptanceCoverageView|null $data = null,
         public int $version = 2,
     ) {
         if ($version !== 2 || ! in_array($status, ['succeeded', 'rejected', 'failed'], true)

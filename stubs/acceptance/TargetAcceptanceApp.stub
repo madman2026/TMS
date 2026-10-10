@@ -2,11 +2,12 @@
 
 namespace $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance;
 
-use App\Contracts\AcceptanceComponentProvider;
+use App\Contracts\AcceptanceCoverageProvider;
 use App\Data\ComponentDescriptor;
 use Modules\Core\Contracts\AcceptanceScenario;
+use $MODULE_NAMESPACE$\$MODULE_NAME$\Acceptance\Coverage\SourceCaseMappings;
 
-final class $MODULE_NAME$AcceptanceApp implements AcceptanceComponentProvider
+final class $MODULE_NAME$AcceptanceApp implements AcceptanceCoverageProvider
 {
     public function key(): string
     {
@@ -44,6 +45,11 @@ final class $MODULE_NAME$AcceptanceApp implements AcceptanceComponentProvider
         foreach ($this->componentProviders() as $component) {
             yield from $component->variants($scenarioKey);
         }
+    }
+
+    public function sourceCaseMappings(): iterable
+    {
+        yield from SourceCaseMappings::all();
     }
 
     public function resolveScenario(

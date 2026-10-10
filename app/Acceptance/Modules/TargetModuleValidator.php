@@ -87,7 +87,10 @@ final class TargetModuleValidator
         $app = $this->read($path, $appRelative);
         if ($app !== null) {
             if (! preg_match("/return '([a-z0-9][a-z0-9._-]{0,63})';/D", $app, $matches)
-                || ! str_contains($app, 'implements AcceptanceComponentProvider')) {
+                || ! str_contains($app, 'implements AcceptanceCoverageProvider')
+                || ! str_contains($app, 'use App\\Contracts\\AcceptanceCoverageProvider;')
+                || ! str_contains($app, 'function sourceCaseMappings(): iterable')
+                || ! str_contains($app, 'yield from SourceCaseMappings::all();')) {
                 $issues[] = new ValidationIssue('target_module_acceptance_app_invalid', $appRelative);
             } else {
                 $appKey = $matches[1];

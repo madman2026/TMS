@@ -8,6 +8,7 @@ use App\Acceptance\Modules\NwidartTargetModuleCreator;
 use App\Acceptance\Modules\TargetModuleDefinition;
 use App\Acceptance\Modules\TargetModuleValidator;
 use App\Contracts\AcceptanceComponentProvider;
+use App\Contracts\AcceptanceCoverageProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -62,6 +63,7 @@ class AcceptanceHierarchyTest extends TestCase
         $provider = new GeneratedTargetAcceptanceApp;
 
         $this->assertInstanceOf(AcceptanceComponentProvider::class, $provider);
+        $this->assertInstanceOf(AcceptanceCoverageProvider::class, $provider);
         $this->assertSame(['billing'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->components())));
         $this->assertSame(['invoices'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->suites())));
         $this->assertSame(['invoice-creates', 'invoice-deletes'], array_map(fn ($item): string => $item->key, iterator_to_array($provider->scenarios())));
@@ -74,6 +76,10 @@ class AcceptanceHierarchyTest extends TestCase
         $this->assertSame(AutomationDisposition::NOT_IMPLEMENTED, $scenario?->metadata()->disposition);
         $this->assertNull($provider->resolveScenario('billing', 'wrong', 'invoice-creates', 'default'));
         $this->assertCount(2, SourceCaseMappings::all());
+        $this->assertSame(['case-1', 'case-2'], array_map(
+            fn (SourceCaseMapping $mapping): string => $mapping->sourceCaseId,
+            iterator_to_array($provider->sourceCaseMappings()),
+        ));
         $validation = $validator->validate('GeneratedTarget');
         $this->assertTrue($validation->valid, print_r($validation->issues, true));
     }

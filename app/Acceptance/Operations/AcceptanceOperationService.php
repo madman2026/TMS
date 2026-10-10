@@ -3,6 +3,7 @@
 namespace App\Acceptance\Operations;
 
 use App\Acceptance\Coverage\Data\SourceCaseMapping;
+use App\Acceptance\Coverage\Enums\CoverageDisposition;
 use App\Acceptance\Execution\AcceptanceExecutionException as BatchExecutionException;
 use App\Acceptance\Execution\Data\BatchItemOperationData;
 use App\Acceptance\Execution\Data\BatchOperationData;
@@ -16,6 +17,10 @@ use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Operations\Data\TargetModuleValidationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
 use App\Acceptance\Prerequisites\PrerequisiteException;
+use App\Acceptance\Reporting\AcceptanceReportingException;
+use App\Acceptance\Reporting\Data\AcceptanceCoverageView;
+use App\Acceptance\Reporting\Data\AcceptanceReport;
+use App\Acceptance\Reporting\Data\AcceptanceStatusView;
 use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
@@ -41,6 +46,7 @@ final class AcceptanceOperationService
         'acceptance_batch_not_found', 'acceptance_batch_empty', 'acceptance_batch_conflict',
         'acceptance_batch_transition_invalid', 'acceptance_batch_plan_changed',
         'acceptance_attempt_not_found', 'acceptance_retry_not_safe', 'acceptance_batch_cancelled',
+        'acceptance_report_not_found', 'acceptance_report_query_invalid', 'acceptance_export_limit_exceeded',
     ];
 
     private const ADMIN_CODES = [
@@ -50,6 +56,8 @@ final class AcceptanceOperationService
         'target_module_path_invalid',
         'prerequisite_schema_invalid', 'schema_changed',
         'unsafe_target', 'resource_unavailable',
+        'acceptance_coverage_mapping_invalid', 'acceptance_coverage_incomplete',
+        'acceptance_evidence_reference_invalid', 'acceptance_reporting_failed',
     ];
 
     public function __construct(private readonly AcceptanceOperationRegistry $registry) {}
@@ -104,7 +112,9 @@ final class AcceptanceOperationService
                 || ($result->status === 'rejected' && $data !== null
                     && ! $data instanceof TargetResourceLifecycleData)
                 || (($data instanceof CatalogOperationData || $data instanceof ModuleChangeData
-                    || $data instanceof TargetModuleValidationData || $data instanceof PrerequisiteOperationData)
+                    || $data instanceof TargetModuleValidationData || $data instanceof PrerequisiteOperationData
+                    || $data instanceof AcceptanceStatusView || $data instanceof AcceptanceReport
+                    || $data instanceof AcceptanceCoverageView)
                     && $result->status !== 'succeeded')
                 || ($data instanceof PrerequisiteOperationData
                     && ! $this->matchesPrerequisiteData($data, $request, $correlationId, $operationId))
@@ -114,6 +124,7 @@ final class AcceptanceOperationService
                 || ($data instanceof BatchOperationData && ($data->operationId !== $operationId
                     || ($operation === 'acceptance.batch.start' && $data->correlationId !== $correlationId)))
                 || ($data instanceof BatchItemOperationData && $data->operationId !== $operationId)
+                || ! $this->matchesReportingData($data, $request)
                 || ($data instanceof TargetResourceLifecycleData
                     && (($data->primaryErrorCode ?? $data->cleanupErrorCode) !== $result->errorCode
                         || ! $this->matchesLifecycleData($data, $request, $correlationId, $operationId)))) {
@@ -161,6 +172,14 @@ final class AcceptanceOperationService
 
             return $this->finish($operation, $status, $exception->errorCode, $correlationId, $operationId,
                 exceptionClass: $exception::class, identityContext: $identityContext);
+        } catch (AcceptanceReportingException $exception) {
+            $status = in_array($exception->errorCode, [
+                'acceptance_report_not_found', 'acceptance_report_query_invalid',
+                'acceptance_export_limit_exceeded', 'acceptance_configuration_invalid',
+            ], true) ? 'rejected' : 'failed';
+
+            return $this->finish($operation, $status, $exception->errorCode, $correlationId, null,
+                exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (Throwable) {
             return $this->finish($operation, 'failed', $this->fallback($operation), $correlationId, $operationId,
                 identityContext: $identityContext);
@@ -190,6 +209,9 @@ final class AcceptanceOperationService
             'acceptance.batch.resume' => ['batch_id', 'operation_id', 'expected_lock_version', 'prerequisite_references'],
             'acceptance.batch.item.retry' => ['item_id', 'expected_lock_version'],
             'acceptance.batch.cancel' => ['batch_id', 'operation_id', 'expected_lock_version'],
+            'acceptance.status' => ['batch_id', 'operation_id'],
+            'acceptance.report' => ['batch_id', 'after_item_id', 'limit'],
+            'acceptance.coverage' => ['app_key', 'after_source_case_id', 'limit', 'disposition'],
             default => [...$lists, 'limit'],
         };
         $errors = [];
@@ -201,9 +223,10 @@ final class AcceptanceOperationService
             }
             $valid = match ($field) {
                 'app_key', 'component_key', 'suite_key', 'scenario_key', 'variant_key' => is_string($value)
-                    && (! $completeHierarchy || (strlen($value) <= 64
+                    && (! ($completeHierarchy || $request->operation === 'acceptance.coverage') || (strlen($value) <= 64
                         && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1)),
-                'profile_id', 'limit' => is_int($value) || is_string($value),
+                'profile_id', 'limit' => (is_int($value) && $value > 0)
+                    || (is_string($value) && ctype_digit($value) && (int) $value > 0),
                 'browser' => $value === null || is_string($value),
                 'headed' => is_bool($value),
                 'timeout_ms', 'slow_mo_ms' => $value === null || is_int($value) || is_string($value),
@@ -217,13 +240,21 @@ final class AcceptanceOperationService
                 'scope' => is_string($value) && strlen($value) <= 64
                     && preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $value) === 1,
                 'mode' => is_string($value) && in_array($value, ['sync', 'async'], true),
-                'batch_id', 'item_id' => (is_int($value) && $value > 0)
+                'batch_id', 'item_id', 'after_item_id' => (is_int($value) && $value > 0)
                     || (is_string($value) && ctype_digit($value) && (int) $value > 0),
                 'operation_id' => is_string($value) && OperationResult::isUuid($value),
+                'after_source_case_id' => is_string($value)
+                    && preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/D', $value) === 1,
                 'prerequisite_references' => is_array($value) && array_is_list($value)
                     && count(array_filter($value, fn (mixed $entry): bool => $entry instanceof BatchPrerequisiteReference)) === count($value),
                 default => is_array($value) && array_is_list($value)
-                    && count(array_filter($value, 'is_string')) === count($value),
+                    && count(array_filter($value, 'is_string')) === count($value)
+                    && ($field !== 'disposition' || $request->operation !== 'acceptance.coverage'
+                        || count(array_filter($value, fn (string $item): bool => in_array(
+                            $item,
+                            array_column(CoverageDisposition::cases(), 'value'),
+                            true,
+                        ))) === count($value)),
             };
             if (! $valid) {
                 $errors[$field] = ['operation_request_invalid'];
@@ -248,6 +279,8 @@ final class AcceptanceOperationService
             'acceptance.batch.resume' => ['batch_id', 'operation_id', 'expected_lock_version'],
             'acceptance.batch.item.retry' => ['item_id', 'expected_lock_version'],
             'acceptance.batch.cancel' => ['batch_id', 'operation_id', 'expected_lock_version'],
+            'acceptance.report' => ['batch_id'],
+            'acceptance.coverage' => ['app_key'],
             default => [],
         };
         foreach ($required as $field) {
@@ -261,6 +294,13 @@ final class AcceptanceOperationService
             $byRequest = ['request_id'];
             $byIdentity = ['app_key', 'component_key', 'profile_id', 'scenario_key', 'suite_key', 'variant_key'];
             if ($keys !== $byRequest && $keys !== $byIdentity) {
+                $errors['parameters'] = ['operation_request_invalid'];
+            }
+        }
+        if ($request->operation === 'acceptance.status') {
+            $hasBatch = array_key_exists('batch_id', $request->parameters);
+            $hasOperation = array_key_exists('operation_id', $request->parameters);
+            if ($hasBatch === $hasOperation || count($request->parameters) !== 1) {
                 $errors['parameters'] = ['operation_request_invalid'];
             }
         }
@@ -304,6 +344,7 @@ final class AcceptanceOperationService
             'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel' => 'prerequisite_persistence_failed',
             'acceptance.batch.start', 'acceptance.batch.resume', 'acceptance.batch.item.retry',
             'acceptance.batch.cancel' => 'acceptance_execution_persistence_failed',
+            'acceptance.status', 'acceptance.report', 'acceptance.coverage' => 'acceptance_reporting_failed',
             default => 'acceptance_catalog_failed',
         };
     }
@@ -361,6 +402,23 @@ final class AcceptanceOperationService
             && $data->profileId === (int) $request->parameters['profile_id'];
     }
 
+    private function matchesReportingData(mixed $data, OperationRequest $request): bool
+    {
+        return match (true) {
+            $data instanceof AcceptanceStatusView => isset($request->parameters['batch_id'])
+                ? $data->batchId === (int) $request->parameters['batch_id']
+                : $data->operationId === ($request->parameters['operation_id'] ?? null),
+            $data instanceof AcceptanceReport => $data->status->batchId === (int) ($request->parameters['batch_id'] ?? 0)
+                && $data->afterItemId === (isset($request->parameters['after_item_id'])
+                    ? (int) $request->parameters['after_item_id'] : null)
+                && (! isset($request->parameters['limit']) || $data->limit === (int) $request->parameters['limit']),
+            $data instanceof AcceptanceCoverageView => $data->appKey === ($request->parameters['app_key'] ?? null)
+                && $data->afterSourceCaseId === ($request->parameters['after_source_case_id'] ?? null)
+                && (! isset($request->parameters['limit']) || $data->limit === (int) $request->parameters['limit']),
+            default => true,
+        };
+    }
+
     /** Include only validated language-neutral identifiers and flags in logs. */
     private function safeContext(OperationRequest $request): array
     {
@@ -389,6 +447,16 @@ final class AcceptanceOperationService
         ], true)) {
             $context['dry_run'] = true;
         }
+        foreach (['batch_id', 'item_id'] as $field) {
+            $value = $request->parameters[$field] ?? null;
+            if ((is_int($value) && $value > 0) || (is_string($value) && ctype_digit($value) && (int) $value > 0)) {
+                $context[$field] = (int) $value;
+            }
+        }
+        $subjectOperationId = $request->parameters['operation_id'] ?? null;
+        if (is_string($subjectOperationId) && OperationResult::isUuid($subjectOperationId)) {
+            $context['subject_operation_id'] = $subjectOperationId;
+        }
 
         return $context;
     }
@@ -408,6 +476,9 @@ final class AcceptanceOperationService
             'acceptance.prerequisite.approval.grant', 'acceptance.prerequisite.request.cancel' => $data instanceof PrerequisiteOperationData,
             'acceptance.batch.start', 'acceptance.batch.resume', 'acceptance.batch.cancel' => $data instanceof BatchOperationData,
             'acceptance.batch.item.retry' => $data instanceof BatchItemOperationData,
+            'acceptance.status' => $data instanceof AcceptanceStatusView,
+            'acceptance.report' => $data instanceof AcceptanceReport,
+            'acceptance.coverage' => $data instanceof AcceptanceCoverageView,
             default => false,
         };
     }
@@ -418,7 +489,7 @@ final class AcceptanceOperationService
         ?string $code,
         string $correlationId,
         ?string $operationId,
-        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|null $data = null,
+        CatalogOperationData|RunOperationData|ModuleChangeData|TargetModuleValidationData|PrerequisiteOperationData|TargetResourceLifecycleData|BatchOperationData|BatchItemOperationData|AcceptanceStatusView|AcceptanceReport|AcceptanceCoverageView|null $data = null,
         array $errors = [],
         ?string $exceptionClass = null,
         array $identityContext = [],
@@ -428,6 +499,7 @@ final class AcceptanceOperationService
             in_array($code, ['unsafe_target', 'resource_unavailable'], true) => [false, true, true],
             in_array($code, self::REJECTED_CODES, true),
             in_array($code, ['acceptance_configuration_invalid', 'acceptance_scenario_failed', 'acceptance_step_failed'], true) => [false, true, false],
+            $code === 'acceptance_reporting_failed' => [null, null, true],
             in_array($code, self::ADMIN_CODES, true) => [false, true, true],
             $code === 'acceptance_catalog_changed' => [true, false, false],
             $code === 'conflict' => [true, false, false],
@@ -478,7 +550,8 @@ final class AcceptanceOperationService
             $context['item_state'] = $data->state->value;
         }
         if (in_array($exceptionClass, [AcceptanceCatalogException::class, AcceptanceRegistryException::class,
-            AcceptanceExecutionException::class, TargetModuleException::class, PrerequisiteException::class], true)) {
+            AcceptanceExecutionException::class, TargetModuleException::class, PrerequisiteException::class,
+            AcceptanceReportingException::class], true)) {
             $context['exception_class'] = $exceptionClass;
         }
         if ($status !== 'succeeded') {

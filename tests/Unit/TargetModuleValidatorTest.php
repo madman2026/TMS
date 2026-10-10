@@ -66,7 +66,7 @@ class TargetModuleValidatorTest extends TestCase
         $this->files->put(
             $this->root.'/ExampleTarget/app/Acceptance/ExampleTargetAcceptanceApp.php',
             str_replace(
-                ['implements AcceptanceComponentProvider', '// </tms:components>'],
+                ['implements AcceptanceCoverageProvider', '// </tms:components>'],
                 ['', "            'missing' => new \\Modules\\ExampleTarget\\Acceptance\\Components\\Missing\\MissingAcceptanceComponent,"],
                 $app,
             ),
