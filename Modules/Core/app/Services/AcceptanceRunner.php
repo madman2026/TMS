@@ -4,6 +4,7 @@ namespace Modules\Core\Services;
 
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\BrowserFactory;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
@@ -20,6 +21,7 @@ class AcceptanceRunner
     public function run(
         AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
+        BrowserTargetRuntime $targetRuntime,
         RunOptions $options,
     ): RunResult {
         $startedAt = microtime(true);
@@ -35,7 +37,7 @@ class AcceptanceRunner
             }
             $scenarioName = $scenario->name();
             $browserContext = $this->createBrowserContext($options);
-            $context = new TestContext($browserContext, $options->timeoutMs);
+            $context = new TestContext($browserContext, $identity, $targetRuntime, $options->timeoutMs);
             $steps = [];
             $passed = true;
             $errorCode = null;

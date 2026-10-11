@@ -33,9 +33,20 @@ final class TargetModuleValidator
         return $this->validatePath($definition, $path);
     }
 
-    public function validatePath(TargetModuleDefinition $definition, string $path): TargetModuleValidationData
-    {
+    /** @param array<string, string> $componentOverrides */
+    public function validatePath(
+        TargetModuleDefinition $definition,
+        string $path,
+        array $componentOverrides = [],
+    ): TargetModuleValidationData {
         [$root, $path] = $this->safePaths($definition, $path);
+        foreach ($componentOverrides as $relative => $content) {
+            if (! is_string($relative) || ! is_string($content)
+                || preg_match('#^app/Acceptance/Components/[A-Za-z0-9]+/[A-Za-z0-9]+AcceptanceComponent\.php$#D', $relative) !== 1
+                || ! $this->files->isFile($this->join($path, $relative))) {
+                throw TargetModuleException::because('target_module_path_invalid');
+            }
+        }
         $issues = [];
         $checked = [];
         $requiredFiles = [
@@ -119,15 +130,16 @@ final class TargetModuleValidator
             foreach ($this->files->allFiles($components) as $file) {
                 $relative = $this->relative($path, $file->getPathname());
                 $checked[] = $relative;
+                $content = $componentOverrides[$relative] ?? $file->getContents();
                 if (str_ends_with($relative, 'AcceptanceComponent.php')
-                    && ! $this->markersValid($file->getContents(), ['suites', 'scenarios', 'variants', 'resolutions'])) {
+                    && ! $this->markersValid($content, ['suites', 'scenarios', 'variants', 'resolutions'])) {
                     $issues[] = new ValidationIssue('target_module_managed_region_invalid', $relative);
                 }
                 if (str_ends_with($relative, 'AcceptanceComponent.php')) {
                     $class = pathinfo($file->getFilename(), PATHINFO_FILENAME);
                     $componentKey = array_search(substr($class, 0, -strlen('AcceptanceComponent')), $componentOwners, true);
                     if (! is_string($componentKey)
-                        || ! $this->hierarchyValid($file->getContents(), $componentKey, $suiteOwners, $scenarioOwners, $variantOwners)) {
+                        || ! $this->hierarchyValid($content, $componentKey, $suiteOwners, $scenarioOwners, $variantOwners)) {
                         $issues[] = new ValidationIssue('acceptance_hierarchy_invalid', $relative);
                     }
                 }
@@ -285,7 +297,15 @@ final class TargetModuleValidator
             }
             $suites[$match[1]] = $componentKey;
         }
-        preg_match_all("/ScenarioDescriptor\\('([^']+)', '([^']+)', '([^']+)'/", $content, $scenarioMatches, PREG_SET_ORDER);
+        preg_match_all(
+            "/ScenarioDescriptor\\('([^']+)', '([^']+)', '([^']+)', \\\$this->metadataFor\\('([^']+)'\\)\\)/",
+            $content,
+            $scenarioMatches,
+            PREG_SET_ORDER,
+        );
+        if (substr_count($content, 'new ScenarioDescriptor(') !== count($scenarioMatches)) {
+            return false;
+        }
         foreach ($scenarioMatches as $match) {
             $owner = $match[2]."\0".$match[3];
             $classCollision = false;
@@ -295,7 +315,7 @@ final class TargetModuleValidator
                     break;
                 }
             }
-            if ($match[2] !== $componentKey || ($suites[$match[3]] ?? null) !== $componentKey
+            if ($match[1] !== $match[4] || $match[2] !== $componentKey || ($suites[$match[3]] ?? null) !== $componentKey
                 || isset($scenarios[$match[1]]) || $classCollision) {
                 return false;
             }

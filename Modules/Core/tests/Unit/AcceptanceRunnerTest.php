@@ -7,6 +7,7 @@ use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\BrowserFactory;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
@@ -38,10 +39,11 @@ class AcceptanceRunnerTest extends TestCase
         });
         $identity = $this->identity();
 
-        $result = $runner->run($identity, $scenario, new RunOptions);
+        $result = $runner->run($identity, $scenario, $this->runtime(), new RunOptions);
 
         $this->assertTrue($result->passed);
         $this->assertSame($identity, $result->identity);
+        $this->assertSame($identity, $scenario->lastContextIdentity);
         $this->assertSame(['first', 'second'], array_column($result->steps, 'name'));
         $this->assertCount(1, array_unique($contexts));
         $browser->shouldHaveReceived('close')->once();
@@ -63,7 +65,7 @@ class AcceptanceRunnerTest extends TestCase
             yield new StepResult(name: 'must not run', passed: true);
         });
 
-        $result = $runner->run($this->identity(), $scenario, new RunOptions);
+        $result = $runner->run($this->identity(), $scenario, $this->runtime(), new RunOptions);
 
         $this->assertFalse($result->passed);
         $this->assertSame('acceptance_step_failed', $result->errorCode);
@@ -88,7 +90,7 @@ class AcceptanceRunnerTest extends TestCase
             yield new StepResult(name: 'continued', passed: true);
         });
 
-        $result = $runner->run($this->identity(), $scenario, new RunOptions);
+        $result = $runner->run($this->identity(), $scenario, $this->runtime(), new RunOptions);
 
         $this->assertFalse($result->passed);
         $this->assertTrue($laterStepRan);
@@ -105,7 +107,7 @@ class AcceptanceRunnerTest extends TestCase
         });
 
         try {
-            $runner->run($this->identity(), $scenario, new RunOptions);
+            $runner->run($this->identity(), $scenario, $this->runtime(), new RunOptions);
             $this->fail('Expected an AcceptanceExecutionException.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_scenario_failed', $exception->errorCode);
@@ -125,7 +127,7 @@ class AcceptanceRunnerTest extends TestCase
         $runner = new AcceptanceRunner($factory);
 
         try {
-            $runner->run($this->identity(), $this->scenario(fn (): array => []), new RunOptions);
+            $runner->run($this->identity(), $this->scenario(fn (): array => []), $this->runtime(false), new RunOptions);
             $this->fail('Expected an AcceptanceExecutionException.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_browser_start_failed', $exception->errorCode);
@@ -142,7 +144,7 @@ class AcceptanceRunnerTest extends TestCase
         $browser->shouldReceive('setDefaultNavigationTimeout')->once()->with(30_000);
         $browser->shouldReceive('newPage')->once()->andReturn($page);
         $browser->shouldReceive('close')->once();
-        $context = new TestContext($browser, 30_000);
+        $context = new TestContext($browser, $this->identity(), $this->runtime(), 30_000);
 
         $context->close();
         $context->close();
@@ -239,10 +241,22 @@ class AcceptanceRunnerTest extends TestCase
         );
     }
 
+    private function runtime(bool $expectsPrepare = true): BrowserTargetRuntime
+    {
+        $runtime = Mockery::mock(BrowserTargetRuntime::class);
+        if ($expectsPrepare) {
+            $runtime->shouldReceive('prepare')->once();
+        }
+
+        return $runtime;
+    }
+
     private function scenario(Closure $steps): AcceptanceScenario
     {
         return new class($steps) implements AcceptanceScenario
         {
+            public ?AcceptanceExecutionIdentity $lastContextIdentity = null;
+
             public function __construct(private readonly Closure $steps) {}
 
             public function key(): string
@@ -267,6 +281,7 @@ class AcceptanceRunnerTest extends TestCase
 
             public function steps(TestContext $context): iterable
             {
+                $this->lastContextIdentity = $context->identity;
                 yield from ($this->steps)($context);
             }
         };

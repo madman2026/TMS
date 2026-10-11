@@ -17,6 +17,7 @@ use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputType;
 use App\Acceptance\Prerequisites\Enums\PrerequisiteState;
 use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetBrowserRuntimeResolver;
 use App\Acceptance\Targets\Contracts\TargetCleanup;
 use App\Acceptance\Targets\Contracts\TargetFixtureManager;
 use App\Acceptance\Targets\Contracts\TargetOracle;
@@ -29,6 +30,7 @@ use App\Acceptance\Targets\Data\TargetEnvironment;
 use App\Acceptance\Targets\Data\TargetExecutionOutcome;
 use App\Acceptance\Targets\Data\TargetOracleResult;
 use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetBrowserRuntimeRegistry;
 use App\Acceptance\Targets\TargetResourceAdapters;
 use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
@@ -53,6 +55,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
@@ -451,6 +454,19 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         $registry = new TargetResourceRegistry;
         $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
         $this->app->instance(TargetResourceRegistry::class, $registry);
+        $runtime = Mockery::mock(BrowserTargetRuntime::class);
+        $resolver = new class($runtime) implements TargetBrowserRuntimeResolver
+        {
+            public function __construct(private readonly BrowserTargetRuntime $runtime) {}
+
+            public function resolve(TargetContext $context): BrowserTargetRuntime
+            {
+                return $this->runtime;
+            }
+        };
+        $browserRuntimes = new TargetBrowserRuntimeRegistry;
+        $browserRuntimes->register('app-a', $resolver);
+        $this->app->instance(TargetBrowserRuntimeRegistry::class, $browserRuntimes);
         $test = $profile->tests()->create([
             'name' => 'Scenario A',
             ...$this->identity(),

@@ -8,6 +8,7 @@ use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Targets\Data\TargetContext;
 use App\Acceptance\Targets\Data\TargetExecutionOutcome;
 use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
+use App\Acceptance\Targets\TargetBrowserRuntimeRegistry;
 use App\Acceptance\Targets\TargetResourceCoordinator;
 use App\Models\Profile;
 use App\Models\Test;
@@ -26,6 +27,7 @@ final class AcceptanceExecutionService
     public function __construct(
         private readonly AcceptanceRunService $runService,
         private readonly TargetResourceCoordinator $resources,
+        private readonly TargetBrowserRuntimeRegistry $browserRuntimes,
     ) {}
 
     public function execute(
@@ -55,12 +57,30 @@ final class AcceptanceExecutionService
         $lifecycle = $this->resources->execute(
             $context,
             $prerequisites,
-            function () use (&$test, $profile, $identity, $scenario, $options, $trace, $onExecutorEntry): TargetExecutionOutcome {
+            function (TargetContext $targetContext) use (&$test, $profile, $identity, $scenario, $options, $trace, $onExecutorEntry): TargetExecutionOutcome {
+                if ($onExecutorEntry !== null && $onExecutorEntry() !== true) {
+                    return $this->executionFailure('acceptance_attempt_stale', false);
+                }
+
                 try {
-                    if ($onExecutorEntry !== null && $onExecutorEntry() !== true) {
-                        return $this->executionFailure('acceptance_attempt_stale', false);
+                    $resolver = $this->browserRuntimes->for($targetContext->appKey);
+                    if ($resolver === null) {
+                        return $this->executionFailure('resource_unavailable', false);
                     }
-                    $test = $this->runService->run($profile, $identity, $scenario, $options, $trace);
+                    $targetRuntime = $resolver->resolve($targetContext);
+                } catch (Throwable) {
+                    return $this->executionFailure('resource_unavailable', false);
+                }
+
+                try {
+                    $test = $this->runService->run(
+                        $profile,
+                        $identity,
+                        $scenario,
+                        $targetRuntime,
+                        $options,
+                        $trace,
+                    );
                 } catch (CoreExecutionException $exception) {
                     return $this->executionFailure($exception->errorCode, false);
                 } catch (Throwable) {

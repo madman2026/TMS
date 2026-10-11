@@ -4,6 +4,7 @@ namespace Modules\Core\Tests\Feature;
 
 use App\Contracts\BaseAction;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
@@ -16,6 +17,8 @@ use Modules\Core\Services\PlaywrightBrowserFactory;
 use Modules\Core\Traits\Assertion;
 use Modules\Core\Traits\HasStep;
 use PHPUnit\Framework\TestCase;
+use Playwright\Browser\BrowserContextInterface;
+use Playwright\Page\PageInterface;
 use Tests\Support\BrowserTestConfiguration;
 
 class PlaywrightAcceptanceSmokeTest extends TestCase
@@ -93,7 +96,7 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         };
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
-        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions(
+        $result = $runner->run($this->identity($scenario->key()), $scenario, $this->runtime(), new RunOptions(
             headless: BrowserTestConfiguration::headless(),
             contextOptions: ['viewport' => ['width' => 800, 'height' => 600]],
         ));
@@ -156,7 +159,7 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         };
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
-        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions(
+        $result = $runner->run($this->identity($scenario->key()), $scenario, $this->runtime(), new RunOptions(
             headless: BrowserTestConfiguration::headless(),
         ));
 
@@ -175,5 +178,15 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
             $scenarioKey,
             'chromium',
         );
+    }
+
+    private function runtime(): BrowserTargetRuntime
+    {
+        return new class implements BrowserTargetRuntime
+        {
+            public function prepare(BrowserContextInterface $browser): void {}
+
+            public function open(PageInterface $page, string $surfaceKey): void {}
+        };
     }
 }

@@ -104,7 +104,7 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
 
     public function importScenarios(string $moduleName, array $mappings, bool $dryRun = true): ModuleChangeData
     {
-        $definition = $this->existingDefinition($moduleName);
+        [$definition, $componentContents] = $this->existingDefinitionForImport($moduleName);
         $this->assertMappings($mappings);
         [, $modulePath] = $this->validator->safePaths($definition);
         $app = $this->files->get($this->join($modulePath, 'app/Acceptance/'.$moduleName.'AcceptanceApp.php'));
@@ -114,8 +114,7 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         $newFiles = [];
         $updates = [];
         $changeActions = [];
-        $componentContents = [];
-        $hierarchy = $this->hierarchyIndex($modulePath, $components);
+        $hierarchy = $this->hierarchyIndex($modulePath, $components, $componentContents);
 
         foreach ($mappings as $mapping) {
             $mappingExists = str_contains($mappingContent, trim($this->sourceMappingLine($mapping)));
@@ -148,13 +147,14 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
                 throw TargetModuleException::because('acceptance_source_mapping_invalid');
             }
             $content = $componentContents[$componentRelative] ?? $this->files->get($componentPath);
+            $content = $this->migrateScenarioMetadataContract($content);
             $scenarioClass = Str::studly($mapping->scenarioKey);
             $this->assertScenarioCollision($content, $mapping->scenarioKey, $scenarioClass, $mapping->suiteKey);
             $content = $this->mergeManagedLines($content, 'suites', [
                 "        yield new SuiteDescriptor('{$mapping->suiteKey}', '{$componentKey}');",
             ]);
             $content = $this->mergeManagedLines($content, 'scenarios', [
-                "        yield new ScenarioDescriptor('{$mapping->scenarioKey}', '{$componentKey}', '{$mapping->suiteKey}', \$this->metadata());",
+                "        yield new ScenarioDescriptor('{$mapping->scenarioKey}', '{$componentKey}', '{$mapping->suiteKey}', \$this->metadataFor('{$mapping->scenarioKey}'));",
             ]);
             $content = $this->mergeManagedLines($content, 'variants', [
                 "        if (\$scenarioKey === '{$mapping->scenarioKey}') { yield new VariantDescriptor('{$mapping->variantKey}'); }",
@@ -273,6 +273,48 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         return new TargetModuleDefinition($moduleName, $validation->appKey, $this->moduleNamespace());
     }
 
+    /** @return array{TargetModuleDefinition, array<string, string>} */
+    private function existingDefinitionForImport(string $moduleName): array
+    {
+        if (! preg_match('/^[A-Z][A-Za-z0-9]{0,63}$/D', $moduleName)) {
+            throw TargetModuleException::because('target_module_name_invalid');
+        }
+        $validation = $this->validator->validate($moduleName);
+        if ($validation->valid && $validation->appKey !== null) {
+            return [new TargetModuleDefinition($moduleName, $validation->appKey, $this->moduleNamespace()), []];
+        }
+        if ($validation->appKey === null) {
+            throw TargetModuleException::because('target_module_validation_failed');
+        }
+        foreach ($validation->issues as $issue) {
+            if (! in_array($issue->code, ['acceptance_hierarchy_invalid', 'acceptance_source_mapping_invalid'], true)) {
+                throw TargetModuleException::because('target_module_validation_failed');
+            }
+        }
+
+        $definition = new TargetModuleDefinition($moduleName, $validation->appKey, $this->moduleNamespace());
+        [, $modulePath] = $this->validator->safePaths($definition);
+        $app = $this->files->get($this->join($modulePath, 'app/Acceptance/'.$moduleName.'AcceptanceApp.php'));
+        $componentContents = [];
+        $migrated = false;
+        foreach ($this->componentMap($app) as $componentClass) {
+            $relative = 'app/Acceptance/Components/'.$componentClass.'/'.$componentClass.'AcceptanceComponent.php';
+            $path = $this->join($modulePath, $relative);
+            if (! $this->files->isFile($path)) {
+                throw TargetModuleException::because('target_module_validation_failed');
+            }
+            $original = $this->files->get($path);
+            $componentContents[$relative] = $this->migrateScenarioMetadataContract($original);
+            $migrated = $migrated || $componentContents[$relative] !== $original;
+        }
+        $candidate = $this->validator->validatePath($definition, $modulePath, $componentContents);
+        if (! $migrated || ! $candidate->valid || $candidate->appKey !== $definition->appKey) {
+            throw TargetModuleException::because('target_module_validation_failed');
+        }
+
+        return [$definition, $componentContents];
+    }
+
     private function assertHierarchyKey(string $key): void
     {
         try {
@@ -385,8 +427,12 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         }
     }
 
-    /** @param array<string, string> $components @return array{suites: array<string, string>, scenarios: array<string, string>, variants: array<string, string>} */
-    private function hierarchyIndex(string $modulePath, array $components): array
+    /**
+     * @param  array<string, string>  $components
+     * @param  array<string, string>  $componentContents
+     * @return array{suites: array<string, string>, scenarios: array<string, string>, variants: array<string, string>}
+     */
+    private function hierarchyIndex(string $modulePath, array $components, array $componentContents = []): array
     {
         $result = ['suites' => [], 'scenarios' => [], 'variants' => []];
         foreach ($components as $componentKey => $componentClass) {
@@ -395,7 +441,8 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             if (! $this->files->isFile($path)) {
                 throw TargetModuleException::because('target_module_validation_failed');
             }
-            $content = $this->files->get($path);
+            $relative = 'app/Acceptance/Components/'.$componentClass.'/'.$componentClass.'AcceptanceComponent.php';
+            $content = $componentContents[$relative] ?? $this->files->get($path);
             preg_match_all("/SuiteDescriptor\\('([^']+)', '([^']+)'\\)/", $content, $suites, PREG_SET_ORDER);
             foreach ($suites as $suite) {
                 $result['suites'][$suite[1]] = $suite[2];
@@ -433,6 +480,37 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         $replacement .= $match[1].'// </tms:'.$region.'>';
 
         return preg_replace($pattern, $replacement, $content, 1) ?? throw TargetModuleException::because('target_module_path_collision');
+    }
+
+    private function migrateScenarioMetadataContract(string $content): string
+    {
+        if (! str_contains($content, '$this->metadata()')) {
+            return $content;
+        }
+
+        $legacyHook = 'private function metadata(): ScenarioMetadata';
+        if (substr_count($content, $legacyHook) !== 1
+            || str_contains($content, 'private function metadataFor(string $scenarioKey): ScenarioMetadata')) {
+            throw TargetModuleException::because('target_module_path_collision');
+        }
+
+        $pattern = "/^(?<indent>[ \\t]*)yield new ScenarioDescriptor\\('(?<scenario>[a-z0-9][a-z0-9._-]{0,63})', '(?<component>[a-z0-9][a-z0-9._-]{0,63})', '(?<suite>[a-z0-9][a-z0-9._-]{0,63})', \\\$this->metadata\\(\\)\\);\\r?$/m";
+        $migrated = preg_replace_callback(
+            $pattern,
+            static fn (array $match): string => $match['indent']
+                ."yield new ScenarioDescriptor('{$match['scenario']}', '{$match['component']}', '{$match['suite']}', "
+                ."\$this->metadataFor('{$match['scenario']}'));",
+            $content,
+        );
+        if ($migrated === null || str_contains($migrated, '$this->metadata()')) {
+            throw TargetModuleException::because('target_module_path_collision');
+        }
+
+        return str_replace(
+            $legacyHook,
+            'private function metadataFor(string $scenarioKey): ScenarioMetadata',
+            $migrated,
+        );
     }
 
     /** @param array<string, string> $newFiles @param array<string, string> $updates */

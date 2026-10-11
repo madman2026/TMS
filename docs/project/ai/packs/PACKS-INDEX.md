@@ -20,6 +20,7 @@ This index owns TMS project-wide and repository-governance Pack navigation. Modu
 | DK target module and owner bootstrap (0016) | accepted — operator accepted 2026-10-10; technical validation passed | `docs/project/ai/packs/AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016.md` |
 | Second-target proof and scale hardening (0017) | draft — stage 16; regenerate after owner-local stages 11–15 | `docs/project/ai/packs/AI-PACK-TMS-SECOND-TARGET-SCALE-HARDENING-0017.md` |
 | Central PHPUnit browser mode (0018) | accepted — operator pre-approved result and commit 2026-10-11; focused validation passed | `docs/project/ai/packs/AI-PACK-TMS-CENTRAL-TEST-BROWSER-MODE-0018.md` |
+| Bounded Browser Acceptance execution context (0019) | accepted — validation passed; operator accepted Run 001 and authorized commit 2026-10-11 | `docs/project/ai/packs/AI-PACK-TMS-ACCEPTANCE-EXECUTION-CONTEXT-0019.md` |
 
 Read only the current Pack required for the active task. An executed Pack and Run remain unaccepted until the operator completes the stated acceptance gate.
 

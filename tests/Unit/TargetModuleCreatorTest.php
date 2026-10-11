@@ -99,6 +99,50 @@ class TargetModuleCreatorTest extends TestCase
         $this->assertTrue($this->validator()->validate('ExampleTarget')->valid);
     }
 
+    public function test_legacy_generated_metadata_contract_migrates_once_across_dry_run_apply_and_replay(): void
+    {
+        $creator = $this->creator();
+        $creator->create(new TargetModuleDefinition('ExampleTarget', 'example-app'), false);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-default', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+        ], false);
+        $path = $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php';
+        $current = $this->files->get($path);
+        $legacy = str_replace(
+            ["\$this->metadataFor('invoice-creates')", 'private function metadataFor(string $scenarioKey): ScenarioMetadata'],
+            ['$this->metadata()', 'private function metadata(): ScenarioMetadata'],
+            $current,
+        );
+        $this->files->put($path, $legacy);
+        $edge = [new SourceCaseMapping('case-edge', CoverageDisposition::AUTOMATED_PARTIAL,
+            'billing', 'invoices', 'invoice-creates', 'edge', reason: 'bounded coverage',
+            coveredAssertions: ['creates'], uncoveredAssertions: ['external-side-effect'])];
+
+        $dryRun = $creator->importScenarios('ExampleTarget', $edge);
+
+        $this->assertTrue($dryRun->dryRun);
+        $this->assertSame($legacy, $this->files->get($path));
+
+        $applied = $creator->importScenarios('ExampleTarget', $edge, false);
+        $migrated = $this->files->get($path);
+        $replayed = $creator->importScenarios('ExampleTarget', $edge, false);
+
+        $this->assertFalse($applied->dryRun);
+        $this->assertStringNotContainsString('$this->metadata()', $migrated);
+        $this->assertStringContainsString(
+            "yield new ScenarioDescriptor('invoice-creates', 'billing', 'invoices', \$this->metadataFor('invoice-creates'));",
+            $migrated,
+        );
+        $this->assertStringContainsString("yield new SuiteDescriptor('invoices', 'billing');", $migrated);
+        $this->assertSame(1, substr_count($migrated, "new ScenarioDescriptor('invoice-creates'"));
+        $this->assertSame(0, $replayed->created());
+        $this->assertSame(0, $replayed->updated());
+        $this->assertSame($migrated, $this->files->get($path));
+        $this->assertTrue($this->validator()->validate('ExampleTarget')->valid);
+    }
+
     public function test_existing_module_and_derived_class_collisions_are_rejected_without_overwrite(): void
     {
         $creator = $this->creator();

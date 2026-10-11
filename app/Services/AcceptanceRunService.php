@@ -8,6 +8,7 @@ use App\TestStatusEnum;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\ExecutorRegistry;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\BrowserExecutorData;
@@ -31,6 +32,7 @@ class AcceptanceRunService
         Profile $profile,
         AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
+        BrowserTargetRuntime $targetRuntime,
         ?RunOptions $options = null,
         ?ExecutorTraceContext $trace = null,
     ): Test {
@@ -47,11 +49,12 @@ class AcceptanceRunService
 
         try {
             if ($this->executors === null) {
-                $result = $this->runner->run($identity, $scenario, $options ?? $this->defaultOptions());
+                $result = $this->runner->run($identity, $scenario, $targetRuntime, $options ?? $this->defaultOptions());
             } else {
                 $request = ExecutorRequest::browser(
                     $identity,
                     $scenario,
+                    $targetRuntime,
                     $options ?? $this->defaultOptions(),
                     $this->traceWithTest($trace, (int) $test->getKey()),
                 );

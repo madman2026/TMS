@@ -7,6 +7,7 @@ namespace Modules\Core\Tests\Unit;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
@@ -18,6 +19,7 @@ use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
 use Modules\Core\Enums\ExecutorResultStatus;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
+use Modules\Core\Exceptions\ExecutorException;
 use Modules\Core\Services\AcceptanceRunner;
 use Modules\Core\Services\BrowserAcceptanceExecutor;
 use PHPUnit\Framework\TestCase;
@@ -27,13 +29,29 @@ final class BrowserAcceptanceExecutorTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    public function test_browser_request_with_target_runtime_cannot_be_serialized(): void
+    {
+        $request = $this->request();
+
+        try {
+            serialize($request);
+            $this->fail('Expected the in-memory Browser request to reject serialization.');
+        } catch (ExecutorException $exception) {
+            $this->assertSame('executor_request_invalid', $exception->errorCode);
+        }
+
+        $this->expectException(ExecutorException::class);
+
+        json_encode($request, JSON_THROW_ON_ERROR);
+    }
+
     public function test_it_delegates_once_and_returns_an_ordered_safe_summary(): void
     {
         $request = $this->request();
         $runner = Mockery::mock(AcceptanceRunner::class);
         $runner->shouldReceive('run')
             ->once()
-            ->with($request->identity, $request->scenario, $request->runOptions)
+            ->with($request->identity, $request->scenario, $request->targetRuntime, $request->runOptions)
             ->andReturn(new RunResult(
                 identity: $request->identity,
                 scenarioName: 'Safe scenario',
@@ -170,6 +188,11 @@ final class BrowserAcceptanceExecutorTest extends TestCase
             }
         };
 
-        return ExecutorRequest::browser($identity, $scenario, new RunOptions);
+        return ExecutorRequest::browser(
+            $identity,
+            $scenario,
+            Mockery::mock(BrowserTargetRuntime::class),
+            new RunOptions,
+        );
     }
 }

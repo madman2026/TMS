@@ -154,6 +154,30 @@ class TargetModuleValidatorTest extends TestCase
         $this->assertContains('acceptance_hierarchy_invalid', array_column($result->issues, 'code'));
     }
 
+    public function test_scenario_metadata_key_must_match_the_descriptor_key(): void
+    {
+        $modules = $this->modules();
+        $config = $this->config();
+        $creator = new NwidartTargetModuleCreator($modules, $this->files, $config, $this->validator);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-1', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+        ], false);
+        $path = $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php';
+        $content = $this->files->get($path);
+        $this->files->put($path, str_replace(
+            "metadataFor('invoice-creates')",
+            "metadataFor('different-scenario')",
+            $content,
+        ));
+
+        $result = $this->validator->validate('ExampleTarget');
+
+        $this->assertFalse($result->valid);
+        $this->assertContains('acceptance_hierarchy_invalid', array_column($result->issues, 'code'));
+    }
+
     private function modules(): RepositoryInterface
     {
         $root = $this->root;

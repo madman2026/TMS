@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetBrowserRuntimeResolver;
 use App\Acceptance\Targets\Contracts\TargetCleanup;
 use App\Acceptance\Targets\Contracts\TargetFixtureManager;
 use App\Acceptance\Targets\Contracts\TargetOracle;
@@ -16,6 +17,7 @@ use App\Acceptance\Targets\Data\TargetEnvironment;
 use App\Acceptance\Targets\Data\TargetExecutionOutcome;
 use App\Acceptance\Targets\Data\TargetOracleResult;
 use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetBrowserRuntimeRegistry;
 use App\Acceptance\Targets\TargetResourceAdapters;
 use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
@@ -33,6 +35,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Data\RunOptions;
@@ -79,6 +82,7 @@ class AcceptanceRunCommandTest extends TestCase
             Profile $actualProfile,
             AcceptanceExecutionIdentity $identity,
             AcceptanceScenario $actualScenario,
+            BrowserTargetRuntime $runtime,
             $options,
         ) use ($profile, $scenario): bool {
             return $actualProfile->is($profile)
@@ -193,6 +197,7 @@ class AcceptanceRunCommandTest extends TestCase
             Profile $actualProfile,
             AcceptanceExecutionIdentity $identity,
             AcceptanceScenario $actualScenario,
+            BrowserTargetRuntime $runtime,
             RunOptions $options,
         ) use ($profile, $scenario): bool {
             $this->assertTrue($actualProfile->is($profile));
@@ -521,6 +526,20 @@ class AcceptanceRunCommandTest extends TestCase
         $registry = new TargetResourceRegistry;
         $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
         $this->app->instance(TargetResourceRegistry::class, $registry);
+
+        $runtime = Mockery::mock(BrowserTargetRuntime::class);
+        $resolver = new class($runtime) implements TargetBrowserRuntimeResolver
+        {
+            public function __construct(private readonly BrowserTargetRuntime $runtime) {}
+
+            public function resolve(TargetContext $context): BrowserTargetRuntime
+            {
+                return $this->runtime;
+            }
+        };
+        $browserRuntimes = new TargetBrowserRuntimeRegistry;
+        $browserRuntimes->register('app-a', $resolver);
+        $this->app->instance(TargetBrowserRuntimeRegistry::class, $browserRuntimes);
     }
 
     private function profile(): Profile

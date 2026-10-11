@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
@@ -34,10 +35,12 @@ class AcceptanceRunPersistenceTest extends TestCase
     {
         $identity = $this->identity();
         $scenario = $this->scenario();
+        $runtime = $this->runtime();
         $runner = Mockery::mock(AcceptanceRunner::class);
         $runner->shouldReceive('run')->once()->withArgs(
-            fn (AcceptanceExecutionIdentity $actual, AcceptanceScenario $actualScenario): bool => $actual->value() === $identity->value()
-                && $actualScenario === $scenario,
+            fn (AcceptanceExecutionIdentity $actual, AcceptanceScenario $actualScenario, BrowserTargetRuntime $actualRuntime): bool => $actual->value() === $identity->value()
+                && $actualScenario === $scenario
+                && $actualRuntime === $runtime,
         )->andReturn(new RunResult(
             identity: $identity,
             scenarioName: 'Scenario A',
@@ -51,7 +54,7 @@ class AcceptanceRunPersistenceTest extends TestCase
             )],
         ));
 
-        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $scenario, new RunOptions);
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $scenario, $runtime, new RunOptions);
 
         $this->assertSame(TestStatusEnum::FINISHED, $test->status);
         $this->assertSame([
@@ -81,7 +84,7 @@ class AcceptanceRunPersistenceTest extends TestCase
             AcceptanceExecutionException::browserStartFailed(new RuntimeException('example-sensitive-value')),
         );
 
-        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario());
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario(), $this->runtime());
 
         $this->assertSame(TestStatusEnum::FAILED, $test->status);
         $this->assertSame('acceptance_browser_start_failed', $test->error_code);
@@ -119,7 +122,7 @@ class AcceptanceRunPersistenceTest extends TestCase
             errorCode: 'acceptance_step_failed',
         ));
 
-        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario());
+        $test = (new AcceptanceRunService($runner))->run($this->profile(), $identity, $this->scenario(), $this->runtime());
 
         $this->assertSame(TestStatusEnum::FAILED, $test->status);
         $this->assertSame('acceptance_step_failed', $test->error_code);
@@ -157,7 +160,7 @@ class AcceptanceRunPersistenceTest extends TestCase
         };
 
         try {
-            $service->run($this->profile(), $identity, $this->scenario());
+            $service->run($this->profile(), $identity, $this->scenario(), $this->runtime());
             $this->fail('Expected a normalized persistence failure.');
         } catch (AcceptanceExecutionException $exception) {
             $this->assertSame('acceptance_result_persistence_failed', $exception->errorCode);
@@ -258,6 +261,11 @@ class AcceptanceRunPersistenceTest extends TestCase
                 return [];
             }
         };
+    }
+
+    private function runtime(): BrowserTargetRuntime
+    {
+        return Mockery::mock(BrowserTargetRuntime::class);
     }
 
     private function profile(): Profile

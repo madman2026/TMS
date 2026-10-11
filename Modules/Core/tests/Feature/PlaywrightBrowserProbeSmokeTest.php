@@ -6,10 +6,13 @@ namespace Modules\Core\Tests\Feature;
 
 use Closure;
 use Modules\Core\Contracts\BrowserProbe;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Contracts\TestContext;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 use Modules\Core\Enums\BrowserObservationStatus;
 use Modules\Core\Exceptions\BrowserProbeException;
 use PHPUnit\Framework\TestCase;
+use Playwright\Browser\BrowserContextInterface;
 use Playwright\Configuration\PlaywrightConfig;
 use Playwright\Network\RouteInterface;
 use Playwright\Page\PageInterface;
@@ -261,7 +264,7 @@ class PlaywrightBrowserProbeSmokeTest extends TestCase
                 'viewport' => ['width' => 800, 'height' => 600], 'hasTouch' => $hasTouch,
             ]);
             $browserContext->route('**/*', static fn (RouteInterface $route) => $route->abort());
-            $context = new TestContext($browserContext, 5000);
+            $context = new TestContext($browserContext, $this->identity(), $this->runtime(), 5000);
             $test($context->page, $context->browserProbe);
         } finally {
             // Nested finally blocks also close the bridge if an earlier cleanup fails.
@@ -280,5 +283,20 @@ class PlaywrightBrowserProbeSmokeTest extends TestCase
                 }
             }
         }
+    }
+
+    private function identity(): AcceptanceExecutionIdentity
+    {
+        return new AcceptanceExecutionIdentity('local-smoke-app', 'browser', 'probe', 'probe-smoke', 'chromium');
+    }
+
+    private function runtime(): BrowserTargetRuntime
+    {
+        return new class implements BrowserTargetRuntime
+        {
+            public function prepare(BrowserContextInterface $browser): void {}
+
+            public function open(PageInterface $page, string $surfaceKey): void {}
+        };
     }
 }

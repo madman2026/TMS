@@ -6,7 +6,7 @@ Make target scenario imports runtime-resolvable and scale-validatable before own
 
 ## 2. Status
 
-Partially implemented — Decisions 0018–0019 and Remediations 0003–0004 corrected and validated the retained DK descriptor imports and generic CLI test isolation; the complete suite now passes. Shared importer/validator prevention, generated-source formatting policy, and bounded PCRE execution remain proposed and separately gated.
+Partially implemented — Decisions 0018–0019 and Remediations 0003–0004 corrected and validated the retained DK descriptor imports and generic CLI test isolation; the complete suite now passes. The per-scenario metadata/replay-prevention slice is approved through Change Request 0009 and assigned to Pack 0019. Descriptor-resolution prevention, generated-source formatting policy, bounded PCRE execution, and remaining scale hardening stay proposed and separately gated here.
 
 ## 3. Related Release / Phase
 
@@ -33,6 +33,8 @@ The remaining proposed shared remediation must separately:
 2. define and validate the supported formatting policy for large generated managed regions, including whether they are exempt from ordinary Pint formatting or must be emitted in a formatter-compatible representation;
 3. remove the need for an undocumented process-local `pcre.backtrack_limit` override during accepted chunk import, or explicitly establish and validate a bounded supported execution requirement;
 4. correct reusable documentation/examples that still show the nonexistent `--app=dk` coverage option.
+
+Change Request 0009 and Pack 0019 additionally own only the replay-safe migration from a shared generated `metadata()` call to exact keyed `metadataFor('<scenario-key>')` calls. That bounded dependency slice does not close the remaining items above.
 
 ## 6. Reason for Change
 
@@ -61,6 +63,8 @@ The approved targeted remediation scope is defined by Remediations 0003–0004 a
 - `tests/Unit/TargetModuleValidatorTest.php`;
 - focused shared importer/validator tests;
 - directly related future Change, Remediation, Pack, Run, and index records.
+
+The exact per-scenario metadata migration files are listed in project Pack 0019 and are not an expansion of this Change Request's unresolved scale/format scope.
 
 Decisions 0018–0019 and Remediations 0003–0004 authorize only the exact DK import correction, two-test isolation, and their validation. They do not authorize shared production-source changes.
 

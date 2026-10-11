@@ -38,8 +38,9 @@ final readonly class BrowserAcceptanceExecutor implements AcceptanceExecutor
 
         try {
             $scenario = $request->scenario;
+            $targetRuntime = $request->targetRuntime;
             $runOptions = $request->runOptions;
-            $run = $this->runner->run($request->identity, $scenario, $runOptions);
+            $run = $this->runner->run($request->identity, $scenario, $targetRuntime, $runOptions);
 
             if ($run->identity !== $request->identity) {
                 throw new ExecutorException('unsafe_executor_result');

@@ -41,7 +41,7 @@ final class $COMPONENT_CLASS$AcceptanceComponent
         return null;
     }
 
-    private function metadata(): ScenarioMetadata
+    private function metadataFor(string $scenarioKey): ScenarioMetadata
     {
         // Imported skeletons remain non-executable until an owner-local Pack adds behavior.
         return new ScenarioMetadata([], [], AutomationDisposition::NOT_IMPLEMENTED, EvidenceMode::METADATA_ONLY);

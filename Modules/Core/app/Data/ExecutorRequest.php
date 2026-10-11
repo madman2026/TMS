@@ -6,6 +6,7 @@ namespace Modules\Core\Data;
 
 use JsonSerializable;
 use Modules\Core\Contracts\AcceptanceScenario;
+use Modules\Core\Contracts\BrowserTargetRuntime;
 use Modules\Core\Exceptions\ExecutorException;
 
 final readonly class ExecutorRequest implements JsonSerializable
@@ -15,12 +16,13 @@ final readonly class ExecutorRequest implements JsonSerializable
         public ExecutorCapability $capability,
         public ExecutorTraceContext $trace,
         public ?AcceptanceScenario $scenario,
+        public ?BrowserTargetRuntime $targetRuntime,
         public ?RunOptions $runOptions,
         public ?HttpExecutorRequest $http,
         public int $version,
     ) {
-        $browserPayload = $scenario !== null && $runOptions !== null && $http === null;
-        $httpPayload = $scenario === null && $runOptions === null && $http !== null;
+        $browserPayload = $scenario !== null && $targetRuntime !== null && $runOptions !== null && $http === null;
+        $httpPayload = $scenario === null && $targetRuntime === null && $runOptions === null && $http !== null;
 
         if ($version !== 1
             || (! $browserPayload && ! $httpPayload)
@@ -33,6 +35,7 @@ final readonly class ExecutorRequest implements JsonSerializable
     public static function browser(
         AcceptanceExecutionIdentity $identity,
         AcceptanceScenario $scenario,
+        BrowserTargetRuntime $targetRuntime,
         RunOptions $runOptions,
         ?ExecutorTraceContext $trace = null,
     ): self {
@@ -41,6 +44,7 @@ final readonly class ExecutorRequest implements JsonSerializable
             ExecutorCapability::browser(),
             $trace ?? new ExecutorTraceContext,
             $scenario,
+            $targetRuntime,
             $runOptions,
             null,
             1,
@@ -58,6 +62,7 @@ final readonly class ExecutorRequest implements JsonSerializable
             $trace ?? new ExecutorTraceContext,
             null,
             null,
+            null,
             $http,
             1,
         );
@@ -67,6 +72,7 @@ final readonly class ExecutorRequest implements JsonSerializable
     {
         return $this->capability->key === ExecutorCapability::BROWSER
             && $this->scenario !== null
+            && $this->targetRuntime !== null
             && $this->runOptions !== null
             && $this->http === null;
     }
@@ -75,6 +81,7 @@ final readonly class ExecutorRequest implements JsonSerializable
     {
         return $this->capability->key === ExecutorCapability::HTTP
             && $this->scenario === null
+            && $this->targetRuntime === null
             && $this->runOptions === null
             && $this->http !== null;
     }
