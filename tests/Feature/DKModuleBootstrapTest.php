@@ -25,13 +25,13 @@ class DKModuleBootstrapTest extends TestCase
         $this->assertInstanceOf(DKAcceptanceApp::class, $registry->app('dk'));
     }
 
-    public function test_dk_exposes_a_valid_component_only_catalog_and_module_definition(): void
+    public function test_dk_exposes_a_valid_imported_catalog_and_module_definition(): void
     {
         $catalog = $this->app->make(AcceptanceCatalog::class);
         $validation = $this->app->make(TargetModuleValidator::class)->validate('DK');
 
         $this->assertSame(['dk'], $catalog->appKeys());
-        $this->assertSame('v2', $catalog->version('dk'));
+        $this->assertSame('v3', $catalog->version('dk'));
         $this->assertSame(
             ['notification-delivery'],
             array_map(
@@ -39,8 +39,8 @@ class DKModuleBootstrapTest extends TestCase
                 iterator_to_array($catalog->components('dk')),
             ),
         );
-        $this->assertSame([], iterator_to_array($catalog->suites('dk')));
-        $this->assertSame([], iterator_to_array($catalog->descriptors('dk')));
+        $this->assertCount(10, iterator_to_array($catalog->suites('dk')));
+        $this->assertCount(139, iterator_to_array($catalog->descriptors('dk')));
         $this->assertSame([], iterator_to_array($catalog->variants('dk', 'missing-scenario')));
         $this->assertSame('DK', $validation->moduleName);
         $this->assertSame('dk', $validation->appKey);

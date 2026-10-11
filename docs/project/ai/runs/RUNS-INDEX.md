@@ -15,5 +15,7 @@
 | Query, reporting, evidence, and traceability run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-QUERY-REPORT-EVIDENCE-0014-run-001.md` |
 | Complete Artisan operator client run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-ARTISAN-OPERATOR-CLIENT-0015-run-001.md` |
 | Acceptance hierarchy hard cutover remediation run 001 | accepted | accepted — operator accepted 2026-10-08 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-ACCEPTANCE-HIERARCHY-CUTOVER-0001-run-001.md` |
+| DK descriptor-import correction remediation run 001 | accepted | accepted — operator accepted 2026-10-11; commit authorized | `docs/project/ai/runs/REMEDIATION-PACK-TMS-DK-DESCRIPTOR-IMPORTS-0003-run-001.md` |
+| Pack 0003 generic CLI test-isolation remediation run 001 | accepted | accepted — operator accepted 2026-10-11; full suite passed; commit authorized | `docs/project/ai/runs/REMEDIATION-PACK-TMS-PACK-0003-CLI-TEST-ISOLATION-0004-run-001.md` |
 | Coverage merged-replacement correction run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-COVERAGE-MERGE-0002-run-001.md` |
 | DK target module and owner bootstrap run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016-run-001.md` |

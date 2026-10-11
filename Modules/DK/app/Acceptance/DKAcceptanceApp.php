@@ -16,7 +16,7 @@ final class DKAcceptanceApp implements AcceptanceCoverageProvider
 
     public function catalogVersion(): string
     {
-        return 'v2';
+        return 'v3';
     }
 
     public function components(): iterable

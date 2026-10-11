@@ -9,6 +9,8 @@ Blocking: No
 Closure Condition: superseded by a separately approved scope or safeguard decision
 Next Review At: project Pack 0007 normalization
 
+Current Security-Boundary Notice (2026-10-10): Temporary Decision 0017 defers dedicated information-protection capabilities only while TMS remains local, single-operator, wholly synthetic, fake-provider-only, and free of real/retained/shared information. Its explicit boundary and stop triggers govern current DK corpus mapping. Production/real-target exclusion, real-secret/data prohibition, `.env` prohibition, and separately gated execution remain active.
+
 Current Roadmap Notice (2026-10-07): Decision 0013 replaces the remaining roadmap sequence. Testing/staging-only targets, synthetic data, target-App ownership, sensitive-value omission, and safe-output constraints remain active. Newly approved Packs must not reinstate the deleted generic secret/fixture proposals; they implement the narrower boundaries in Decisions 0009–0011.
 
 Current Roadmap Notice (2026-10-06): `docs/project/ai/decisions/TMS-DECISION-0006-remove-cancelled-fixture-and-safeguard-packs.md` cancels/removes project 0006 and deletes the superseded Core 0002/project 0005 proposal files. Its fixture dependency, retention instructions and earlier next-Pack directions are superseded. The original decision/reasoning below remains historical; testing/staging, synthetic-data, App ownership, safe-output and deferred-settings constraints remain applicable.

@@ -11,6 +11,8 @@ Next Review At: first DK corpus-mapping Pack
 
 Current Architecture Notice (2026-10-08): Decision 0015 makes removal of the `manual-only` runtime disposition part of the immediate hierarchy-cutover remediation. Source coverage exclusions remain represented only by the five mapping dispositions defined below.
 
+Current Security-Boundary Notice (2026-10-10): Temporary Decision 0017 makes absence of policy-enforced sensitive capture/telemetry/retention suppression insufficient by itself to exclude a scenario while every local, single-operator, wholly synthetic boundary condition holds. It does not change the five disposition values, authorize real data/targets, or accept any Pack for execution.
+
 ## Type
 
 4. Project-level test policy decision

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Acceptance\AcceptanceCommand;
+use App\Services\AcceptanceAppRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -43,6 +44,8 @@ class AcceptanceOperatorCommandsTest extends TestCase
 
     public function test_interactive_catalog_uses_english_laravel_prompts_and_human_output(): void
     {
+        $this->app->instance(AcceptanceAppRegistry::class, new AcceptanceAppRegistry);
+
         $this->artisan('acceptance:list', ['--interactive' => true])
             ->expectsChoice('Configure optional catalog filters?', [], [
                 'app' => 'App keys',

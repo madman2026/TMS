@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\AcceptanceAppRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
@@ -9,6 +10,8 @@ class AcceptanceOperatorJsonContractTest extends TestCase
 {
     public function test_explicit_json_keeps_the_existing_catalog_projection(): void
     {
+        $this->app->instance(AcceptanceAppRegistry::class, new AcceptanceAppRegistry);
+
         $this->assertSame(0, Artisan::call('acceptance:list', ['--json' => true, '--no-interaction' => true]));
         $payload = json_decode(trim(Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
 

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Modules\Core\Enums\AutomationDisposition;
 use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationAuditOracle;
 use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationCallbackSimulator;
 use Modules\DK\Acceptance\Components\NotificationDelivery\Contracts\NotificationProvider;
@@ -20,7 +21,7 @@ use Tests\TestCase;
 
 final class NotificationDeliveryComponentIntegrationTest extends TestCase
 {
-    public function test_container_and_catalog_expose_one_empty_side_effect_free_component(): void
+    public function test_container_and_catalog_expose_the_imported_side_effect_free_component(): void
     {
         Http::preventStrayRequests();
         Notification::fake();
@@ -42,15 +43,26 @@ final class NotificationDeliveryComponentIntegrationTest extends TestCase
         $this->assertSame($provider, $this->app->make(NotificationProvider::class));
 
         $this->assertSame(['dk'], $catalog->appKeys());
-        $this->assertSame('v2', $catalog->version('dk'));
+        $this->assertSame('v3', $catalog->version('dk'));
         $this->assertSame(
             ['notification-delivery'],
             array_map(static fn ($component): string => $component->key, iterator_to_array($catalog->components('dk'))),
         );
-        $this->assertSame([], iterator_to_array($catalog->suites('dk')));
-        $this->assertSame([], iterator_to_array($catalog->descriptors('dk')));
+        $this->assertCount(10, iterator_to_array($catalog->suites('dk')));
+        $descriptors = iterator_to_array($catalog->descriptors('dk'));
+        $this->assertCount(139, $descriptors);
+        $this->assertSame(
+            [AutomationDisposition::NOT_IMPLEMENTED->value],
+            array_values(array_unique(array_map(
+                static fn ($descriptor): string => $descriptor->metadata->disposition->value,
+                $descriptors,
+            ))),
+        );
         $this->assertSame([], iterator_to_array($catalog->variants('dk', 'missing-scenario')));
-        $this->assertSame([], iterator_to_array($this->app->make(AcceptanceAppRegistry::class)->app('dk')->sourceCaseMappings()));
+        $this->assertCount(
+            24668,
+            iterator_to_array($this->app->make(AcceptanceAppRegistry::class)->app('dk')->sourceCaseMappings()),
+        );
         $this->assertNull($this->app->make(AcceptanceAppRegistry::class)->app('dk')->resolveScenario(
             'notification-delivery',
             'missing-suite',

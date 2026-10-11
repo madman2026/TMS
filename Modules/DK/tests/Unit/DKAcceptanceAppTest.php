@@ -12,14 +12,14 @@ use PHPUnit\Framework\TestCase;
 
 class DKAcceptanceAppTest extends TestCase
 {
-    public function test_it_exposes_notification_delivery_without_executable_scenarios(): void
+    public function test_it_exposes_the_imported_notification_delivery_catalog_as_non_executable_skeletons(): void
     {
         $app = new DKAcceptanceApp;
 
         $this->assertInstanceOf(AcceptanceComponentProvider::class, $app);
         $this->assertInstanceOf(AcceptanceCoverageProvider::class, $app);
         $this->assertSame('dk', $app->key());
-        $this->assertSame('v2', $app->catalogVersion());
+        $this->assertSame('v3', $app->catalogVersion());
         $this->assertSame(
             ['notification-delivery'],
             array_map(
@@ -27,10 +27,10 @@ class DKAcceptanceAppTest extends TestCase
                 iterator_to_array($app->components()),
             ),
         );
-        $this->assertSame([], iterator_to_array($app->suites()));
-        $this->assertSame([], iterator_to_array($app->scenarios()));
+        $this->assertCount(10, iterator_to_array($app->suites()));
+        $this->assertCount(139, iterator_to_array($app->scenarios()));
         $this->assertSame([], iterator_to_array($app->variants('missing-scenario')));
-        $this->assertSame([], iterator_to_array($app->sourceCaseMappings()));
+        $this->assertCount(24668, iterator_to_array($app->sourceCaseMappings()));
         $this->assertNull($app->resolveScenario(
             'missing-component',
             'missing-suite',
