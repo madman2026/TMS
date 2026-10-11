@@ -3,9 +3,9 @@
 return [
     'name' => 'Core',
     'acceptance' => [
-        'browser' => 'chromium',
+        'browser' => env('ACCEPTANCE_BROWSER', 'chromium'),
         'headless' => (bool) env('ACCEPTANCE_HEADLESS', true),
-        'timeout_ms' => 30_000,
-        'slow_mo_ms' => 0,
+        'timeout_ms' => (int) env('ACCEPTANCE_BROWSER_TIMEOUT_MS', 30_000),
+        'slow_mo_ms' => (int) env('ACCEPTANCE_BROWSER_SLOW_MO_MS', 0),
     ],
 ];

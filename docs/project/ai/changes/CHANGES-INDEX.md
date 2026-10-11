@@ -9,5 +9,6 @@
 | Allow many source cases to share one merged replacement | implemented and accepted — commit authorized | project coverage mapping contract / Decision 0012 | `docs/project/ai/changes/CHANGE-REQUEST-TMS-COVERAGE-MERGE-0005.md` |
 | Defer information-protection capabilities inside the local synthetic boundary | implemented — documentation and pending DK Pack normalized; no source remediation | project security boundary / Decision 0017 | `docs/project/ai/changes/CHANGE-REQUEST-TMS-INFORMATION-PROTECTION-0006.md` |
 | Make target scenario imports runtime-resolvable and scale-validatable | partially implemented — DK imports and CLI test isolation validated by Decisions 0018–0019/Remediations 0003–0004; full suite passes; shared prevention/scale hardening remain proposed | project target-module importer/validator and DK stage 13 | `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-IMPORT-COMPATIBILITY-0007.md` |
+| Complete configuration and environment declarations | implemented and accepted — validation passed; operator authorized commit 2026-10-11 | project / cross-owner configuration consistency | `docs/project/ai/changes/CHANGE-REQUEST-TMS-CONFIGURATION-SURFACE-0008.md` |
 
 Read the Change Request relevant to the current Decision or planning revision. This record authorizes documentation maintenance only; future Packs retain their own execution gates.
