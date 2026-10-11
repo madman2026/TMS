@@ -1,13 +1,13 @@
 # TMS-DECISION-0021 — Bounded target runtime input and semantic Browser observation
 
-Status: Accepted — implemented and validated by Pack 0020 / Run 001; Run acceptance remains pending
+Status: Accepted — implemented, validated, and operator-accepted through Pack 0020 / Run 001
 Scope: Project / cross-owner Acceptance runtime contract
 Source: Operator approval after DK Pack 0004 pre-execution blocker report
 Date: 2026-10-11
-Review At: Project Pack 0020 Run 001 acceptance and before DK Pack 0004 is re-approved
-Blocking: Yes — DK Pack 0004 remains blocked until Pack 0020 Run 001 is accepted and Pack 0004 is renormalized
+Review At: Before DK Pack 0004 is renormalized and re-approved
+Blocking: Yes — DK Pack 0004 remains blocked until it is renormalized against accepted Pack 0020 source and receives its own gates
 Closure Condition: Project Pack 0020 is implemented, validated, accepted, and DK Pack 0004 is renormalized against its accepted source
-Next Review At: Project Pack 0020 Run 001 acceptance gate
+Next Review At: DK Pack 0004 renormalization gate
 
 ## Type
 
@@ -24,7 +24,7 @@ The shared layer must not resolve `app-secret://...` references, receive raw sec
 
 The observation port must not expose selectors, raw DOM, HTML, translated text, field values, URLs, cookies, storage, headers, console/network payloads, screenshots, traces, or arbitrary JavaScript. It may return only a small allowlisted map of language-neutral semantic fact keys to bounded booleans, integers, finite numbers, nulls, or short lowercase semantic tokens. The target owner maps target-specific DOM state to those facts inside its runtime boundary.
 
-This decision did not itself approve project Pack 0020 execution, DK Pack 0004 execution, browser launch, target access, target product changes, or commit. The operator later approved the bounded Pack 0020 execution, reporting, and commit gates; acceptance remains separate and pending.
+This decision did not itself approve project Pack 0020 execution, DK Pack 0004 execution, browser launch, target access, target product changes, or commit. The operator later approved Pack 0020 execution, accepted Run 001, and authorized commit; DK Pack 0004 and target-access gates remain separate.
 
 ## Reason
 
@@ -80,11 +80,11 @@ Documentation Impact: Yes
 ## Review / Resolution
 
 ```text
-Reviewed In: operator approval on 2026-10-11 after DK Pack 0004 blocker report; Pack 0020 execution, reporting, and commit approvals on 2026-10-11
-Review Result: bounded implementation and validation completed; Run 001 pending operator acceptance
-Resolution: implementation-complete-pending-acceptance
-Next Review At: Project Pack 0020 Run 001 acceptance gate
-Resolution Notes: DK Pack 0004 stays blocked pending accepted Pack 0020 Run 001, source-based renormalization, and its own runtime-only target gate
+Reviewed In: operator approval on 2026-10-11 after DK Pack 0004 blocker report; Pack 0020 execution, Run 001 acceptance, and commit authorization on 2026-10-11
+Review Result: bounded implementation and validation completed; Run 001 accepted
+Resolution: implemented-and-accepted
+Next Review At: DK Pack 0004 renormalization gate
+Resolution Notes: DK Pack 0004 stays blocked pending source-based renormalization and its own runtime-only target gate
 ```
 
 ## Notes

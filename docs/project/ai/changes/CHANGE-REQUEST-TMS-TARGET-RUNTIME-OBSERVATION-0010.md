@@ -6,7 +6,7 @@ Add validated prerequisite-handle handoff to target Browser runtime resolution a
 
 ## 2. Status
 
-Implemented and validated by project Pack 0020 / Run 001 — pending operator acceptance; commit authorized 2026-10-11.
+Implemented and accepted through project Pack 0020 / Run 001 — validation passed and commit authorized 2026-10-11.
 
 ## 3. Related Release / Phase
 
@@ -80,7 +80,7 @@ Yes. Standard project Pack 0020 performs the planned clean signature migration a
 
 ## 12. Required Human Approval
 
-Yes. The operator approved creating this Change Request and enabling Pack, then separately approved Pack 0020 execution, Run reporting, and commit on 2026-10-11. Run 001 acceptance, DK Pack 0004 execution, and target/browser access remain separate approvals.
+Yes. The operator approved creating this Change Request and enabling Pack, then separately approved Pack 0020 execution, accepted Run 001, and authorized commit on 2026-10-11. DK Pack 0004 execution and target/browser access remain separate approvals.
 
 ## 13. Acceptance Criteria
 
@@ -100,7 +100,7 @@ Revert only Pack-0020-owned source/test changes, restore the prior resolver sign
 
 ## 15. Final Decision
 
-Implemented and validated through project Pack 0020 / Run 001. Commit was authorized on 2026-10-11; operator acceptance remains separately gated.
+Implemented and accepted through project Pack 0020 / Run 001. Validation passed and commit was authorized on 2026-10-11.
 
 ## 16. Required remediation
 

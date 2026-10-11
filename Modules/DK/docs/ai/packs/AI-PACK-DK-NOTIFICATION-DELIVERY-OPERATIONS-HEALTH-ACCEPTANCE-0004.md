@@ -1,6 +1,6 @@
 # AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004 — First bounded Notification Delivery Operations Health Browser Acceptance group
 
-Status: `blocked draft — project Pack 0020 is implemented and validated with Run 001 pending review; DK execution still requires Run acceptance, source-based renormalization, and a separate target/runtime gate`
+Status: `blocked draft — project Pack 0020 / Run 001 is accepted; DK execution still requires source-based renormalization and a separate target/runtime gate`
 
 Generated: `2026-10-11`
 
@@ -8,7 +8,7 @@ Owner: DK
 
 Decision: accepted project Decisions 0005, 0007, 0012, 0015, temporary 0017, and accepted Decision 0021; accepted `DK-DECISION-0001` and `DK-DECISION-0002`.
 
-Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Pack 0019 / Run 001; accepted configuration-surface Remediation 0005; implemented `CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010`; and operator acceptance of the implemented and validated `AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020` Run 001.
+Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Packs 0019–0020 and their Run 001 records; accepted configuration-surface Remediation 0005; implemented and accepted `CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010`; source-based Pack 0004 renormalization; and a separate DK target/runtime execution gate.
 
 Execution / Acceptance / Commit: not authorized. Creating this Draft records scope only. Acceptance, execution, target access, tests that launch a browser or connect to a target, and commit each retain separate operator gates.
 
@@ -45,9 +45,9 @@ The original normalized Draft identified three contract gaps:
 2. the selected `variant_key` and safe target resource context do not reach `AcceptanceScenario::steps()`;
 3. DK target-resource resolution, fixture provisioning, oracle evaluation, and cleanup remain fail-closed sentinels.
 
-The first two gaps and the replay-safe generated migration were implemented and accepted through Change Request 0009, project Pack 0019, and Run 001. Pre-execution source inspection on 2026-10-11 then found two additional shared gaps: the runtime resolver did not receive the validated prerequisite handles needed by a target-owned access resolver, and Core had no bounded target-semantic observation port for the required computed/effective/freshness/reason/source facts. Accepted Decision 0021, Change Request 0010, and project Pack 0020 own those shared changes; Pack 0020 implementation and validation now pass with Run 001 pending operator acceptance. DK still owns concrete access resolution, selectors, fixtures, observations, oracle, and cleanup after the shared Pack is accepted. Manual edits inside generated managed regions remain forbidden because Pack-0003 import replay must remain deterministic and idempotent.
+The first two gaps and the replay-safe generated migration were implemented and accepted through Change Request 0009, project Pack 0019, and Run 001. Pre-execution source inspection on 2026-10-11 then found two additional shared gaps: the runtime resolver did not receive the validated prerequisite handles needed by a target-owned access resolver, and Core had no bounded target-semantic observation port for the required computed/effective/freshness/reason/source facts. Accepted Decision 0021, Change Request 0010, and project Pack 0020 own those shared changes; Pack 0020 / Run 001 is now implemented, validated, and accepted. DK still owns concrete access resolution, selectors, fixtures, observations, oracle, and cleanup. Manual edits inside generated managed regions remain forbidden because Pack-0003 import replay must remain deterministic and idempotent.
 
-Configuration-surface Remediation 0005 and project Pack 0019 / Run 001 are accepted. Pack 0004 remains explicitly blocked until project Pack 0020 Run 001 is accepted; it must then be renormalized against the actual shared source before the exact isolated local target procedure and this Pack's own execution gate can be approved.
+Configuration-surface Remediation 0005 and project Packs 0019–0020 / Run 001 are accepted. Pack 0004 remains explicitly blocked until it is renormalized against the actual shared source and the exact isolated local target procedure plus this Pack's own execution gate are approved.
 
 ## 5. Related Release / Phase
 
@@ -95,7 +95,7 @@ The DK-local creation boundary normalized against project Pack 0019 is:
 - `Modules/DK/tests/Feature/NotificationDeliveryOperationsHealthAcceptanceTest.php`;
 - after separately approved execution, `Modules/DK/docs/ai/runs/AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004-run-001.md`.
 
-Project Pack 0019 / Run 001 is implemented, validated, and accepted. Project Pack 0020 implementation and validation pass, with Run 001 pending operator acceptance; no DK implementation file may be created from this Pack. After Pack 0020 is accepted, renormalize sections 8–10 against its actual source before asking for DK execution approval.
+Project Packs 0019–0020 / Run 001 are implemented, validated, and accepted. No DK implementation file may be created from this Pack until sections 8–10 are renormalized against the accepted actual source and the operator separately approves DK execution.
 
 ## 9. Files to Edit
 
@@ -426,7 +426,7 @@ Tests must prove every row above at its owning boundary, including failure stage
 ### Required Follow-up Updates
 
 - Accepted Run 001 for project Pack 0019 and confirmation that its implemented contract matches this normalized scope — completed 2026-10-11.
-- Operator acceptance of the implemented and validated project Pack 0020 Run 001, followed by Pack 0004 renormalization — blocking.
+- Project Pack 0020 Run 001 acceptance — completed 2026-10-11; Pack 0004 source-based renormalization remains blocking.
 - Exact runtime-only isolated local target startup/access procedure and DK-owned reference resolver at Pack 0004's pre-execution gate — blocking.
 - Operator-guide update only if the final local setup changes an operator workflow — conditionally blocking.
 
@@ -650,14 +650,14 @@ Stop before Pack acceptance or execution if:
 
 Blocking before execution:
 
-1. Operator acceptance of the implemented and validated project Pack 0020 Run 001, followed by Pack 0004 renormalization against its actual source.
+1. Pack 0004 renormalization against the accepted actual project Pack 0020 resolver/observer source.
 2. Exact runtime-only isolated local target startup/access procedure, DK-owned opaque-reference resolver, and proof that neither can reach real/staging/production/provider systems.
 
 Resolved for normalization:
 
 - Change Request/Pack identifiers: project CR 0009 and Pack 0019.
 - Safe shared shape: exact identity in `TestContext`; after project Pack 0020 acceptance, target access only through a per-execution `BrowserTargetRuntime` resolved from final `TargetContext` plus exact validated `PrerequisiteExecutionData` by the App-keyed resolver registry.
-- Missing shared capability routing: accepted Decision 0021 and project Change Request 0010 are implemented and validated by Pack 0020 / Run 001, pending operator acceptance.
+- Missing shared capability routing: resolved and accepted through Decision 0021, Change Request 0010, and project Pack 0020 / Run 001.
 - DK adapter paths: `DKBrowserTargetRuntime` and `DKBrowserTargetRuntimeResolver` under `Acceptance/Shared/Target`.
 - Configuration: accepted Remediation 0005 and the existing `core.acceptance.*` surface.
 

@@ -1,6 +1,6 @@
 # AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020 — Bounded target runtime input and semantic Browser observation
 
-Status: executed — implementation and validation completed 2026-10-11; Run 001 is pending operator review; commit authorized 2026-10-11
+Status: accepted — implementation and validation passed; operator accepted Run 001 and authorized commit 2026-10-11
 
 Generated: 2026-10-11
 
@@ -10,7 +10,7 @@ Decision: `TMS-DECISION-0021`
 
 Change Request: `CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010`
 
-Execution / Acceptance / Run / Commit: implementation, approved validation, and Run 001 reporting are complete. Run 001 is `pending-review`; acceptance remains separately pending, and the operator authorized commit on 2026-10-11. No target or external network was used; the complete suite used only the already accepted process-local headless Core Browser smoke boundary.
+Execution / Acceptance / Run / Commit: implementation, approved validation, Run 001 reporting, operator acceptance, and commit authorization are complete as of 2026-10-11. No target or external network was used; the complete suite used only the already accepted process-local headless Core Browser smoke boundary.
 
 ## 1. Task ID
 
@@ -468,4 +468,4 @@ No commit is authorized by this Pack.
 
 ## 34. Open Questions
 
-No shared design or implementation question remains for Pack 0020. The operator approved execution, reporting, and commit on 2026-10-11; Run 001 still awaits separate acceptance. DK-local secret-reference resolution, concrete access source, selector/semantic mapping, fixture/oracle/cleanup behavior, actual target procedure, and target Browser validation remain deliberately unresolved here and blocking for DK Pack 0004.
+No shared design, implementation, or acceptance question remains for Pack 0020. The operator approved execution, accepted Run 001, and authorized commit on 2026-10-11. DK-local secret-reference resolution, concrete access source, selector/semantic mapping, fixture/oracle/cleanup behavior, actual target procedure, and target Browser validation remain deliberately unresolved here and blocking for DK Pack 0004 until that Pack is renormalized and separately approved for execution.

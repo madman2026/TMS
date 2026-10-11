@@ -13,7 +13,7 @@ Created By: AI Agent
 Last Updated: 2026-10-11
 Run Report Path: docs/project/ai/runs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020-run-001.md
 Created Before Commit: Yes
-Run Status: executed
+Run Status: accepted
 ```
 
 ## 2. Pack Reference
@@ -28,7 +28,7 @@ Related Phase: project-owned prerequisite before DK Decision-0015 stage 14 Pack 
 Related Epic / Feature / Story: bounded target-runtime prerequisite handoff and target-owned semantic Browser observation
 Pack Version: Not available.
 Pack Status Before Run: draft with operator execution approval; implementation had not started
-Pack Lifecycle Note: implementation, validation, and reporting are complete; commit was separately authorized on 2026-10-11, while operator acceptance remains pending.
+Pack Lifecycle Note: implementation, validation, and reporting are complete; the operator accepted Run 001 and separately authorized commit on 2026-10-11.
 ```
 
 ## 3. Pack Scope Summary
@@ -152,10 +152,10 @@ The Decision, Change Request, and Pack documents were present in the pre-executi
 
 ### 11.2 Governance / Maintenance Files Modified
 
-- `docs/project/ai/decisions/TMS-DECISION-0021-bounded-target-runtime-input-and-observation.md` and `DECISIONS-INDEX.md` — record implemented/validated, pending-acceptance state.
-- `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md` and `CHANGES-INDEX.md` — record completed acceptance criteria and pending acceptance.
+- `docs/project/ai/decisions/TMS-DECISION-0021-bounded-target-runtime-input-and-observation.md` and `DECISIONS-INDEX.md` — record implemented and accepted state.
+- `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md` and `CHANGES-INDEX.md` — record completed and accepted criteria.
 - `docs/project/ai/packs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020.md` and `PACKS-INDEX.md` — record executed status and completed technical checklist.
-- `docs/project/ai/runs/RUNS-INDEX.md` — register this pending-review Run.
+- `docs/project/ai/runs/RUNS-INDEX.md` — register this accepted Run.
 - `Modules/DK/docs/ai/packs/AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004.md` and `PACKS-INDEX.md` — normalize dependency/blocker state only.
 
 These updates are required by `REPORTING-RULES.md` and `DOCUMENT-MAINTENANCE-RULES.md` and are explicitly allowed by Pack section 9.
@@ -350,11 +350,11 @@ No Canonical record update was required.
   Recorded In: Pack 0020, this Run Report, and related indexes.
   Canonical Update Required: No.
   Follow-up Required: operator review of Run 001.
-- Operator Answer: authorized commit on 2026-10-11 without changing the pending acceptance state.
-  Classification: task-specific commit authorization.
+- Operator Answer: clarified that the post-execution confirmation accepted Pack 0020 / Run 001, and separately authorized commit on 2026-10-11.
+  Classification: task-specific acceptance decision and commit authorization.
   Recorded In: Pack 0020, this Run Report, and related indexes.
   Canonical Update Required: No.
-  Follow-up Required: operator review of Run 001 remains pending.
+  Follow-up Required: none for Pack 0020; DK Pack 0004 remains separate work.
 
 ## 26. Deviations from Original Pack
 
@@ -368,7 +368,7 @@ No unconfirmed assumption affected implementation, validation, or lifecycle stat
 
 Completed:
 - project Decision, Change, Pack, and Run indexes synchronized.
-- DK Pack index synchronized to the precise pending-review blocker state.
+- DK Pack index synchronized to the accepted-prerequisite / pending-renormalization blocker state.
 
 No required index update was omitted.
 
@@ -376,24 +376,24 @@ No required index update was omitted.
 
 - Maintenance rules applied: `DOCUMENT-MAINTENANCE-RULES.md` and `REPORTING-RULES.md`.
 - Owner files checked: project and Core profiles/manifests plus DK owner routing relevant to Pack 0004.
-- Owner/reference drift checked: shared source is now implemented; DK Pack 0004 remains blocked pending acceptance and source-based renormalization.
+- Owner/reference drift checked: shared source is implemented and accepted; DK Pack 0004 remains blocked pending source-based renormalization and its own gates.
 - Related indexes updated: Decision, Change, Pack, Run, and DK Pack indexes.
 - Related template checked: `docs/ai/templates/RUN-REPORT-TEMPLATE.md`.
 - Related decision/change/pack/run records checked and synchronized.
 - No Canonical, API artifact, operator guide, UI, translation, configuration, or reference-corpus update was required.
-- Required follow-up: operator acceptance decision; after acceptance, DK Pack 0004 must be renormalized in its own approved documentation task.
+- Required follow-up: DK Pack 0004 must be renormalized in its own approved documentation task before any execution request.
 
 ## 30. Change / Remediation Links
 
 Related Change Requests:
-- `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md` — implemented and validated; pending operator acceptance.
+- `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md` — implemented, validated, and accepted.
 
 Related Remediation Packs:
 - None.
 
 ## 31. Open Questions
 
-No shared Pack 0020 implementation question remains. Operator acceptance is pending. DK-local access resolution, target procedure, semantic mapping, fixture/oracle/cleanup behavior, and target Browser validation remain intentionally deferred to a renormalized DK Pack 0004.
+No shared Pack 0020 implementation or acceptance question remains. DK-local access resolution, target procedure, semantic mapping, fixture/oracle/cleanup behavior, and target Browser validation remain intentionally deferred to a renormalized DK Pack 0004.
 
 ## 32. Potential Risks
 
@@ -404,10 +404,10 @@ No shared Pack 0020 implementation question remains. Operator acceptance is pend
 ## 33. Human Review Needed
 
 ```text
-Human Review Needed: Yes
-Review Type: operator-review with technical/security scope focus
-Reason: Run 001 is executed and validated but cannot become accepted without the separate operator gate.
-Review Focus: exact object handoff, observation bounds, safe error behavior, no raw/access-bearing output, cleanup, allowlist compliance, and DK blocker normalization.
+Human Review Needed: No further review required for Pack 0020 acceptance
+Review Type: operator-review completed
+Reason: the operator accepted Run 001 and separately authorized commit on 2026-10-11.
+Review Focus: completed
 ```
 
 ## 34. Ready for Review
@@ -418,23 +418,22 @@ Quality Gate Summary:
 - Scope: Passed
 - Tests: Passed
 - Documentation Maintenance: Completed
-- Human Review: Required
+- Human Review: Completed
 ```
 
 ## 35. Acceptance Status
 
 ```text
-Acceptance Status: pending-review
-Accepted / Rejected By: not yet decided
-Reviewed By: pending operator
-Review Date: pending
-Review Notes: implementation and validation evidence are complete; commit was authorized on 2026-10-11, while acceptance remains pending.
+Acceptance Status: accepted
+Accepted / Rejected By: operator
+Reviewed By: operator
+Review Date: 2026-10-11
+Review Notes: implementation and validation evidence accepted; commit separately authorized.
 ```
 
 ## 36. Required Follow-up Updates
 
-- Operator must accept or reject Pack 0020 Run 001.
-- If accepted, DK Pack 0004 must be renormalized against the actual resolver/observer source before any separate target/runtime execution request.
+- DK Pack 0004 must be renormalized against the actual accepted resolver/observer source before any separate target/runtime execution request.
 - The authorized Pack commit must exclude unrelated pre-existing DK reference changes.
 
 ## 37. Traceability Notes
@@ -442,11 +441,11 @@ Review Notes: implementation and validation evidence are complete; commit was au
 ```text
 Related Pack: docs/project/ai/packs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020.md
 Related Run Reports: this Run Report
-Related Reviews: pending operator review in the current execution chat
+Related Reviews: operator acceptance completed in the current execution chat on 2026-10-11
 Related Decisions: docs/project/ai/decisions/TMS-DECISION-0021-bounded-target-runtime-input-and-observation.md
 Related Change Requests: docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md
 Related Remediation Packs: none
-Related Commits: the operator-authorized commit containing this report
+Related Commits: e5fe93e3352a74db84a857c66747e78b82e66521; acceptance lifecycle correction commit containing this update
 Related Branches: main
 Rollback Notes: remove the optional Core observer/value/tests/accessor, restore the prior resolver signature at every exact call site/double, and synchronize lifecycle records; do not use broad reset/clean operations.
 ```
