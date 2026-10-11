@@ -4,9 +4,12 @@ namespace Modules\Core\Contracts;
 
 use InvalidArgumentException;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
+use Modules\Core\Data\BrowserTargetObservation;
+use Modules\Core\Exceptions\AcceptanceExecutionException;
 use Modules\Core\Services\PlaywrightBrowserProbe;
 use Playwright\Browser\BrowserContextInterface;
 use Playwright\Page\PageInterface;
+use Throwable;
 
 class TestContext
 {
@@ -36,6 +39,29 @@ class TestContext
         }
 
         $this->targetRuntime->open($this->page, $surfaceKey);
+    }
+
+    public function observeTarget(string $observationKey): BrowserTargetObservation
+    {
+        if (strlen($observationKey) > 64
+            || preg_match('/^[a-z0-9][a-z0-9._-]*$/D', $observationKey) !== 1
+            || ! $this->targetRuntime instanceof BrowserTargetObserver) {
+            throw AcceptanceExecutionException::configurationInvalid();
+        }
+
+        try {
+            $observation = $this->targetRuntime->observe($this->page, $observationKey);
+        } catch (AcceptanceExecutionException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw AcceptanceExecutionException::configurationInvalid();
+        }
+
+        if ($observation->key !== $observationKey) {
+            throw AcceptanceExecutionException::configurationInvalid();
+        }
+
+        return $observation;
     }
 
     public function close(): void

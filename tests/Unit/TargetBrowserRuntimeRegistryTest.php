@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Targets\Contracts\TargetBrowserRuntimeResolver;
 use App\Acceptance\Targets\Data\TargetContext;
 use App\Acceptance\Targets\TargetBrowserRuntimeRegistry;
@@ -64,8 +65,10 @@ class TargetBrowserRuntimeRegistryTest extends TestCase
         {
             public function __construct(private readonly BrowserTargetRuntime $runtime) {}
 
-            public function resolve(TargetContext $context): BrowserTargetRuntime
-            {
+            public function resolve(
+                TargetContext $context,
+                PrerequisiteExecutionData $prerequisites,
+            ): BrowserTargetRuntime {
                 return $this->runtime;
             }
         };

@@ -357,8 +357,10 @@ class AcceptanceOperationCommandContractTest extends TestCase
         {
             public function __construct(private readonly BrowserTargetRuntime $runtime) {}
 
-            public function resolve(TargetContext $context): BrowserTargetRuntime
-            {
+            public function resolve(
+                TargetContext $context,
+                PrerequisiteExecutionData $prerequisites,
+            ): BrowserTargetRuntime {
                 return $this->runtime;
             }
         };

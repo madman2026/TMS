@@ -57,7 +57,7 @@ final class AcceptanceExecutionService
         $lifecycle = $this->resources->execute(
             $context,
             $prerequisites,
-            function (TargetContext $targetContext) use (&$test, $profile, $identity, $scenario, $options, $trace, $onExecutorEntry): TargetExecutionOutcome {
+            function (TargetContext $targetContext) use (&$test, $profile, $identity, $scenario, $options, $prerequisites, $trace, $onExecutorEntry): TargetExecutionOutcome {
                 if ($onExecutorEntry !== null && $onExecutorEntry() !== true) {
                     return $this->executionFailure('acceptance_attempt_stale', false);
                 }
@@ -67,7 +67,7 @@ final class AcceptanceExecutionService
                     if ($resolver === null) {
                         return $this->executionFailure('resource_unavailable', false);
                     }
-                    $targetRuntime = $resolver->resolve($targetContext);
+                    $targetRuntime = $resolver->resolve($targetContext, $prerequisites);
                 } catch (Throwable) {
                     return $this->executionFailure('resource_unavailable', false);
                 }

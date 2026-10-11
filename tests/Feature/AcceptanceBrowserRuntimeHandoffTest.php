@@ -50,11 +50,17 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
         $runtime = Mockery::mock(BrowserTargetRuntime::class);
         $adapters = new BrowserRuntimeHandoffAdapters;
         $resources = $this->resourceCoordinator($adapters);
+        $prerequisites = $this->prerequisites($profile);
         $runtimes = new TargetBrowserRuntimeRegistry;
         $runtimes->register('app-a', new CallbackTargetBrowserRuntimeResolver(
-            function (TargetContext $context) use ($adapters, $runtime): BrowserTargetRuntime {
+            function (TargetContext $context, PrerequisiteExecutionData $actualPrerequisites) use ($adapters, $runtime, $prerequisites): BrowserTargetRuntime {
                 $adapters->events[] = 'resolver';
                 $adapters->resolvedContext = $context;
+                $adapters->resolvedPrerequisites = $actualPrerequisites;
+
+                if ($actualPrerequisites !== $prerequisites) {
+                    throw new RuntimeException('prerequisite-instance-mismatch');
+                }
 
                 return $runtime;
             },
@@ -91,7 +97,7 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
             $identity,
             $scenario,
             new RunOptions,
-            $this->prerequisites($profile),
+            $prerequisites,
             'dcb1cf9d-207c-4a44-963b-000000000001',
             'dcb1cf9d-207c-4a44-963b-000000000002',
         );
@@ -113,6 +119,9 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
             $adapters->resolvedContext?->scenarioKey,
             $adapters->resolvedContext?->variantKey,
         ]));
+        $this->assertSame($prerequisites, $adapters->resolvedPrerequisites);
+        $this->assertStringNotContainsString('app-secret://app-a/opaque-access-a', print_r($result, true));
+        $this->assertStringNotContainsString('app-secret://app-a/opaque-access-a', print_r($test->fresh()->toArray(), true));
     }
 
     public function test_missing_and_throwing_resolvers_fail_before_run_and_cleanup_acquired_references(): void
@@ -129,7 +138,7 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
             $runtimes = new TargetBrowserRuntimeRegistry;
             if ($case === 'throwing') {
                 $runtimes->register('app-a', new CallbackTargetBrowserRuntimeResolver(
-                    function (TargetContext $context) use ($adapters): BrowserTargetRuntime {
+                    function (TargetContext $context, PrerequisiteExecutionData $prerequisites) use ($adapters): BrowserTargetRuntime {
                         $adapters->events[] = 'resolver';
 
                         throw new RuntimeException('runtime-access-sentinel');
@@ -170,6 +179,7 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
         }
 
         $this->assertStringNotContainsString('runtime-access-sentinel', print_r($results, true));
+        $this->assertStringNotContainsString('app-secret://app-a/opaque-access-a', print_r($results, true));
         $this->assertDatabaseCount('tests', 0);
     }
 
@@ -191,6 +201,8 @@ class AcceptanceBrowserRuntimeHandoffTest extends TestCase
             'scenario-a',
             'variant-a',
             (int) $profile->getKey(),
+            ['scope' => 'synthetic'],
+            ['credential' => 'app-secret://app-a/opaque-access-a'],
         );
     }
 
@@ -217,9 +229,11 @@ final class CallbackTargetBrowserRuntimeResolver implements TargetBrowserRuntime
 {
     public function __construct(private readonly Closure $resolve) {}
 
-    public function resolve(TargetContext $context): BrowserTargetRuntime
-    {
-        return ($this->resolve)($context);
+    public function resolve(
+        TargetContext $context,
+        PrerequisiteExecutionData $prerequisites,
+    ): BrowserTargetRuntime {
+        return ($this->resolve)($context, $prerequisites);
     }
 }
 
@@ -229,6 +243,8 @@ final class BrowserRuntimeHandoffAdapters implements TargetAccountResolver, Targ
     public array $events = [];
 
     public ?TargetContext $resolvedContext = null;
+
+    public ?PrerequisiteExecutionData $resolvedPrerequisites = null;
 
     public function probe(TargetContext $context): TargetReadinessResult
     {
