@@ -19,3 +19,4 @@
 | Pack 0003 generic CLI test-isolation remediation run 001 | accepted | accepted — operator accepted 2026-10-11; full suite passed; commit authorized | `docs/project/ai/runs/REMEDIATION-PACK-TMS-PACK-0003-CLI-TEST-ISOLATION-0004-run-001.md` |
 | Coverage merged-replacement correction run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-COVERAGE-MERGE-0002-run-001.md` |
 | DK target module and owner bootstrap run 001 | accepted | accepted — operator accepted 2026-10-10 | `docs/project/ai/runs/AI-PACK-TMS-DK-TARGET-MODULE-BOOTSTRAP-0016-run-001.md` |
+| Central PHPUnit browser mode run 001 | accepted | accepted — operator pre-approved result and commit 2026-10-11; focused validation passed | `docs/project/ai/runs/AI-PACK-TMS-CENTRAL-TEST-BROWSER-MODE-0018-run-001.md` |

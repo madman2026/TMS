@@ -15,6 +15,7 @@ use Playwright\Network\RouteInterface;
 use Playwright\Page\PageInterface;
 use Playwright\PlaywrightFactory;
 use Psr\Log\NullLogger;
+use Tests\Support\BrowserTestConfiguration;
 
 /** Real local Chrome evidence, not bundled Chromium or other engine coverage. */
 class PlaywrightBrowserProbeSmokeTest extends TestCase
@@ -253,7 +254,9 @@ class PlaywrightBrowserProbeSmokeTest extends TestCase
         $browserContext = null;
         $context = null;
         try {
-            $browser = $client->chromium()->withChannel('chrome')->withHeadless(true)->launch();
+            $browser = $client->chromium()->withChannel('chrome')
+                ->withHeadless(BrowserTestConfiguration::headless())
+                ->launch();
             $browserContext = $browser->newContext([
                 'viewport' => ['width' => 800, 'height' => 600], 'hasTouch' => $hasTouch,
             ]);

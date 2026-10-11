@@ -41,6 +41,7 @@ use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
 use Modules\Core\Exceptions\AcceptanceExecutionException;
 use RuntimeException;
+use Tests\Support\BrowserTestConfiguration;
 use Tests\TestCase;
 
 class AcceptanceRunCommandTest extends TestCase
@@ -178,6 +179,8 @@ class AcceptanceRunCommandTest extends TestCase
 
     public function test_omitted_runtime_options_use_configured_defaults(): void
     {
+        $this->assertSame(BrowserTestConfiguration::headless(), config('core.acceptance.headless'));
+
         [, $scenario] = $this->bindProvider(AutomationDisposition::AUTOMATED);
         $profile = $this->profile();
         $test = $profile->tests()->create([

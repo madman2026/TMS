@@ -16,6 +16,7 @@ use Modules\Core\Services\PlaywrightBrowserFactory;
 use Modules\Core\Traits\Assertion;
 use Modules\Core\Traits\HasStep;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\BrowserTestConfiguration;
 
 class PlaywrightAcceptanceSmokeTest extends TestCase
 {
@@ -93,6 +94,7 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
         $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions(
+            headless: BrowserTestConfiguration::headless(),
             contextOptions: ['viewport' => ['width' => 800, 'height' => 600]],
         ));
 
@@ -154,7 +156,9 @@ class PlaywrightAcceptanceSmokeTest extends TestCase
         };
 
         $runner = new AcceptanceRunner(new PlaywrightBrowserFactory);
-        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions);
+        $result = $runner->run($this->identity($scenario->key()), $scenario, new RunOptions(
+            headless: BrowserTestConfiguration::headless(),
+        ));
 
         $this->assertFalse($result->passed);
         $this->assertSame('acceptance_step_failed', $result->errorCode);
