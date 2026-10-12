@@ -1,6 +1,6 @@
 # ND CORPUS MANIFEST 0001 — Human Acceptance Contract v1
 
-Status: active reference — corpus intake and Decision-0017 mapping normalization completed; Pack 0003 applied/replayed all 25 verified chunks and passed post-Remediation-0003 runtime catalog/coverage validation; operator Pack acceptance and commit pending
+Status: active reference — corpus intake and Decision-0017 mapping normalization completed; Pack 0003 applied/replayed all 25 verified chunks, passed post-Remediation-0003 runtime catalog/coverage validation, and was accepted with Run 001 on 2026-10-11
 
 Owner: DK (consumer reference)
 
@@ -14,7 +14,7 @@ This document is the portable, immutable locator and integrity record for the No
 
 The raw corpus remains in its upstream repository. It is intentionally not copied into TMS because it is upstream-owned, totals 208,690,528 bytes, and would create a second source of truth. TMS may commit only this reference and later DK-derived mappings, tests, generated skeletons, and lifecycle evidence approved by the normalized Pack.
 
-Execution lifecycle note: all recorded chunks were regenerated with matching size/hash metadata, dry-run, applied in order, and replayed with zero creates/updates. The resulting 24,668 mappings and 139 skeletons passed runtime catalog and coverage validation after the operator-approved exact descriptor imports in project Remediation 0003. Shared importer/validator prevention remains open in Change Request 0007. The Pack result is not yet operator-accepted; no successful Run Report or commit exists.
+Execution lifecycle note: all recorded chunks were regenerated with matching size/hash metadata, dry-run, applied in order, and replayed with zero creates/updates. The resulting 24,668 mappings and 139 skeletons passed runtime catalog and coverage validation after the operator-approved exact descriptor imports in project Remediation 0003. The operator accepted Pack 0003 and Run 001 on 2026-10-11. Shared importer/validator prevention remains open in Change Request 0007.
 
 ## Source Identity
 

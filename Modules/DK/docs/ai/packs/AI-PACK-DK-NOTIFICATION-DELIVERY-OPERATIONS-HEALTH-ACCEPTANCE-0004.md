@@ -1,16 +1,16 @@
 # AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004 — First bounded Notification Delivery Operations Health Browser Acceptance group
 
-Status: `blocked draft — project Pack 0020 / Run 001 is accepted; DK execution still requires source-based renormalization and a separate target/runtime gate`
+Status: `blocked draft — architecture, five recipes, secret-handle boundary, and observation contract approved; awaiting accepted enabling Packs, final source allowlist, and separate execution gate`
 
 Generated: `2026-10-11`
 
 Owner: DK
 
-Decision: accepted project Decisions 0005, 0007, 0012, 0015, temporary 0017, and accepted Decision 0021; accepted `DK-DECISION-0001` and `DK-DECISION-0002`.
+Decision: accepted project Decisions 0005, 0007, 0012, 0015, temporary 0017, 0021, and 0022; accepted `DK-DECISION-0001` through `DK-DECISION-0004`.
 
-Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Packs 0019–0020 and their Run 001 records; accepted configuration-surface Remediation 0005; implemented and accepted `CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010`; source-based Pack 0004 renormalization; and a separate DK target/runtime execution gate.
+Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Packs 0019–0020 and their Run 001 records; accepted configuration-surface Remediation 0005; accepted Project Pack 0021 implementing `acceptance-control.v1`; accepted target-project Acceptance Control Agent Pack; accepted target ND Operations Health Driver Pack; accepted Decisions 0022 and DK 0003–0004; a verified deployment secret-provider binding and isolated target manifest; final exact allowlist normalization; and a separate DK target/runtime execution gate.
 
-Execution / Acceptance / Commit: not authorized. Creating this Draft records scope only. Acceptance, execution, target access, tests that launch a browser or connect to a target, and commit each retain separate operator gates.
+Documentation commit: authorized on 2026-10-12. Acceptance, execution, target access, tests that launch a browser or connect to a target, and the later implementation commit each retain separate operator gates.
 
 ## 1. Task ID
 
@@ -47,7 +47,7 @@ The original normalized Draft identified three contract gaps:
 
 The first two gaps and the replay-safe generated migration were implemented and accepted through Change Request 0009, project Pack 0019, and Run 001. Pre-execution source inspection on 2026-10-11 then found two additional shared gaps: the runtime resolver did not receive the validated prerequisite handles needed by a target-owned access resolver, and Core had no bounded target-semantic observation port for the required computed/effective/freshness/reason/source facts. Accepted Decision 0021, Change Request 0010, and project Pack 0020 own those shared changes; Pack 0020 / Run 001 is now implemented, validated, and accepted. DK still owns concrete access resolution, selectors, fixtures, observations, oracle, and cleanup. Manual edits inside generated managed regions remain forbidden because Pack-0003 import replay must remain deterministic and idempotent.
 
-Configuration-surface Remediation 0005 and project Packs 0019–0020 / Run 001 are accepted. Pack 0004 remains explicitly blocked until it is renormalized against the actual shared source and the exact isolated local target procedure plus this Pack's own execution gate are approved.
+Configuration-surface Remediation 0005 and project Packs 0019–0020 / Run 001 are accepted. This Draft is normalized against the actual shared resolver and observation source. On 2026-10-12 the operator accepted `DK-DECISION-0003`, which fixes the run-owned fixture lease, target-clock, reverse-cleanup, and baseline-verification lifecycle, and `DK-DECISION-0004`, which fixes the generic protocol/DK adapter binding, five recipe keys, just-in-time secret resolution, and bounded observation schema. Pack 0004 remains explicitly blocked until Project Pack 0021, the target-project Agent Pack, and the target ND Driver Pack are implemented and accepted, their actual source paths are incorporated into the final allowlist, the deployment binding is verified without exposing values, and this Pack receives its own execution gate.
 
 ## 5. Related Release / Phase
 
@@ -65,12 +65,18 @@ Notification Delivery Operations Health — objective read-only Browser Acceptan
 - `docs/project/ai/decisions/TMS-DECISION-0015-clean-acceptance-hierarchy-cutover.md`
 - `docs/project/ai/decisions/TMS-DECISION-0017-temporary-local-synthetic-data-protection-deferral.md`
 - `docs/project/ai/decisions/TMS-DECISION-0021-bounded-target-runtime-input-and-observation.md`
+- `docs/project/ai/decisions/TMS-DECISION-0022-target-acceptance-control-protocol.md`
 - `Modules/DK/docs/ai/decisions/DK-DECISION-0001-isolated-target-foundation-boundary.md`
 - `Modules/DK/docs/ai/decisions/DK-DECISION-0002-first-bounded-nd-browser-acceptance-group.md`
+- `Modules/DK/docs/ai/decisions/DK-DECISION-0003-operations-health-fixture-lease-lifecycle.md`
+- `Modules/DK/docs/ai/decisions/DK-DECISION-0004-target-control-binding-and-operations-health-recipes.md`
+- `Modules/DK/docs/ai/changes/CHANGE-REQUEST-DK-TARGET-CONTROL-BINDING-0001.md`
 - `docs/project/ai/changes/CHANGE-REQUEST-TMS-ACCEPTANCE-EXECUTION-CONTEXT-0009.md`
 - `docs/project/ai/packs/AI-PACK-TMS-ACCEPTANCE-EXECUTION-CONTEXT-0019.md`
 - `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-RUNTIME-OBSERVATION-0010.md`
 - `docs/project/ai/packs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020.md`
+- `docs/project/ai/packs/AI-PACK-TMS-TARGET-CONTROL-PROTOCOL-0021.md`
+- `docs/project/ai/runs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020-run-001.md`
 - `Modules/DK/docs/ai/packs/AI-PACK-DK-NOTIFICATION-DELIVERY-CORPUS-IMPORT-0003.md`
 - `Modules/DK/docs/ai/runs/AI-PACK-DK-NOTIFICATION-DELIVERY-CORPUS-IMPORT-0003-run-001.md`
 - `Modules/DK/docs/ai/references/ND-CORPUS-MANIFEST-0001.md`
@@ -80,22 +86,25 @@ The manifest pins the authoritative upstream Human Acceptance Contract v1 at com
 
 ## 8. Files to Create
 
-The DK-local creation boundary normalized against project Pack 0019 is:
+The confirmed source-contract portion of the DK-local creation boundary, normalized against accepted project Packs 0019–0020, is:
 
 - `Modules/DK/app/Acceptance/Components/NotificationDelivery/Data/OperationsHealthVariant.php`;
 - `Modules/DK/app/Acceptance/Components/NotificationDelivery/Catalogs/OperationsHealthVariantCatalog.php`;
 - `Modules/DK/app/Acceptance/Components/NotificationDelivery/Selectors/OperationsHealthSelectors.php`;
 - `Modules/DK/app/Acceptance/Components/NotificationDelivery/Fixtures/OperationsHealthFixture.php`;
+- `Modules/DK/app/Acceptance/Shared/Target/Contracts/DKSyntheticTargetControl.php`;
 - `Modules/DK/app/Acceptance/Shared/Target/DKBrowserTargetRuntime.php`;
 - `Modules/DK/app/Acceptance/Shared/Target/DKBrowserTargetRuntimeResolver.php`;
+- `Modules/DK/app/Acceptance/Shared/Target/DKTargetControlAdapter.php`;
 - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Catalogs/OperationsHealthVariantCatalogTest.php`;
 - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Scenarios/NdComponentOperationsHealthTest.php`;
+- `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Fixtures/OperationsHealthFixtureTest.php`;
 - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeTest.php`;
 - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeResolverTest.php`;
 - `Modules/DK/tests/Feature/NotificationDeliveryOperationsHealthAcceptanceTest.php`;
 - after separately approved execution, `Modules/DK/docs/ai/runs/AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004-run-001.md`.
 
-Project Packs 0019–0020 / Run 001 are implemented, validated, and accepted. No DK implementation file may be created from this Pack until sections 8–10 are renormalized against the accepted actual source and the operator separately approves DK execution.
+Project Packs 0019–0020 / Run 001 are implemented, validated, and accepted. Decision 0022 and DK Decision 0004 now assign the runtime-only `app-secret` resolution to the shared injected port and the owner-local mapping to `DKTargetControlAdapter`; no secret value or provider implementation belongs in this module. Sections 8–9 remain a provisional, non-executable allowlist until the three enabling Packs are accepted and their actual namespaces/signatures are verified. Any path adjustment must be a Pack normalization, not an inferred implementation.
 
 ## 9. Files to Edit
 
@@ -140,13 +149,14 @@ No shared project/Core source file is authorized by this DK Pack. Project Pack 0
 - `Modules/Core/app/Contracts/AcceptanceScenario.php`
 - `Modules/Core/app/Contracts/BrowserProbe.php`
 - `Modules/Core/app/Contracts/BrowserTargetRuntime.php`
-- `Modules/Core/app/Contracts/BrowserTargetObserver.php` — after project Pack 0020 acceptance
+- `Modules/Core/app/Contracts/BrowserTargetObserver.php`
 - `Modules/Core/app/Contracts/TestContext.php`
 - `Modules/Core/app/Data/AcceptanceExecutionIdentity.php`
 - `Modules/Core/app/Data/ExecutorRequest.php`
 - `Modules/Core/app/Data/RunOptions.php`
 - `Modules/Core/app/Data/ScenarioMetadata.php`
-- `Modules/Core/app/Data/BrowserTargetObservation.php` — after project Pack 0020 acceptance
+- `Modules/Core/app/Data/BrowserTargetObservation.php`
+- `app/Acceptance/Prerequisites/Data/PrerequisiteExecutionData.php`
 - `Modules/Core/app/Services/AcceptanceRunner.php`
 - `Modules/Core/app/Services/BrowserAcceptanceExecutor.php`
 - `Modules/DK/app/Acceptance/DKAcceptanceApp.php`
@@ -182,7 +192,7 @@ Configuration / Settings Impact: runtime setup required; no versioned configurat
 
 ### Config File Requirements
 
-No config file changes are authorized. Accepted Remediation 0005 established the authoritative root/Core `core.acceptance.*` surface. Preserve `config/core.php`, `Modules/Core/config/config.php`, and `Modules/DK/config/config.php`; Pack 0004 must not reopen, edit, or duplicate that configuration.
+No config file changes are currently authorized. Accepted Remediation 0005 established the authoritative root/Core `core.acceptance.*` surface, while current `Modules/DK/config/config.php` exposes only the fail-closed `dk.target.enabled` and `dk.target.environment` keys. Preserve `config/core.php`, `Modules/Core/config/config.php`, and `Modules/DK/config/config.php`. If the approved target-access procedure requires any additional configuration key, environment declaration, or secret-manager binding, stop and renormalize the exact file allowlist before implementation.
 
 ### Environment Variable Requirements
 
@@ -194,7 +204,7 @@ No Admin Settings changes required.
 
 ### External Integration / Secret Settings Requirements
 
-No external-integration or secret settings are introduced. Runtime target/account/session references must remain opaque, short-lived, synthetic-only, and outside descriptors, logs, reports, source, and persisted Step/Test data.
+No secret value or external-integration setting is introduced by this Draft. An opaque `app-secret://dk/...` handle may be carried only as validated prerequisite data; it is not a usable secret and must remain inert until an approved DK-owned runtime boundary resolves it. Current DK source contains no concrete handle resolver or binding, so its source and resolution procedure remain blocking. Runtime target/account/session values must be short-lived, synthetic-only, confined to private per-execution memory, and absent from descriptors, logs, reports, source, and persisted Step/Test data.
 
 ### Test / Development Setup Requirements
 
@@ -206,7 +216,7 @@ Before an actual Browser Acceptance run, the operator must separately authorize 
 - preventing real Provider, queue worker, scheduler, callback, SMS, notification, or external-network activity;
 - cleaning only run-owned resources and proving unrelated state equals the baseline.
 
-The exact setup command/value remains runtime-only and must be confirmed at Pack 0004's own pre-execution gate. Source scope is fixed: `DKBrowserTargetRuntimeResolver` resolves the final synthetic references into one per-execution `DKBrowserTargetRuntime`, which prepares the Browser context and opens only the semantic Operations Health surface.
+The exact endpoint and credential-provider values remain runtime-only and must be verified without disclosure at Pack 0004's own pre-execution gate. The shared call shape is fixed: `DKBrowserTargetRuntimeResolver::resolve(TargetContext $context, PrerequisiteExecutionData $prerequisites): BrowserTargetRuntime` receives the final context and validated prerequisite handles. The accepted DK-owned `DKTargetControlAdapter` delegates to the project client/secret-resolution ports, returns one fresh per-execution `DKBrowserTargetRuntime`, and is never discovered through the container or another service locator. The runtime then prepares the Browser context and opens only the approved semantic Operations Health surface.
 
 ### Settings Validation
 
@@ -240,12 +250,14 @@ Operator manual setup is required before the real Browser run and must be stated
 
 ## 13. Clarification Questions Before Implementation
 
-The first shared contract and configuration questions are resolved by approved Change Request 0009/project Pack 0019 and accepted Remediation 0005. Before Pack 0004 can be renormalized or executed, the operator must still confirm:
+The shared contract and configuration questions are resolved by approved Change Requests 0009–0010, accepted project Packs 0019–0020, and accepted Remediation 0005. Source-contract renormalization is complete. Before Pack 0004 can be accepted or executed, the operator must still confirm:
 
 1. project Pack 0019 has accepted Run 001 and its implemented contract matches this normalized scope — confirmed 2026-10-11;
-2. project Pack 0020 has an accepted Run and its actual resolver/observer source matches Decision 0021;
-3. the exact isolated local synthetic target startup/access procedure and owner-local reference resolver are available without placing URL/session/credential values in source, docs, chat output, logs, or persisted Test/Step data;
-4. the Browser can reach only that local target and every run-owned reference can be deterministically cleaned.
+2. project Pack 0020 has an accepted Run and its actual resolver/observer source matches Decision 0021 — confirmed 2026-10-11;
+3. the exact isolated local synthetic target startup/access procedure and constructor-injected owner-local resolver for the opaque `app-secret` handle are available without placing URL/session/credential values in source, docs, chat output, logs, or persisted Test/Step data;
+4. the fixture lease lifecycle in `DK-DECISION-0003` is accepted — confirmed 2026-10-12; the exact five-case recipes and concrete local target-control binding/path remain to be approved;
+5. one exact observation key, the complete bounded fact-key set, every allowed token value, and the stable source-owned semantic selectors are approved for the five health cases and presentation matrix;
+6. the Browser can reach only that local target and every run-owned reference can be deterministically cleaned.
 
 ## 14. Multilingual / Translation Requirements
 
@@ -277,6 +289,8 @@ Permission-gated UI Impact: Existing super-user route access only
 
 No UI file is created or edited. The scenario must navigate to the existing semantic Operations Health surface and assert only objective existing behavior:
 
+The following items describe required outcomes only; they are not an implementation schema. Before execution, section 17 must contain the approved single observation key, exact fact keys and token values, and source-owned selectors.
+
 - computed, effective, freshness, reason, sample-rate, and latency values remain distinguishable;
 - expired evidence yields the source-defined unknown effective state;
 - absent `checked_at` yields the source-defined no-evidence freshness state;
@@ -297,7 +311,7 @@ No operator-facing behavior changes in this Draft. If the accepted enabling/targ
 
 ## 17. Implementation Rules
 
-After project Pack 0019 acceptance and this Pack's separate execution approval:
+After accepted project Packs 0019–0020, incorporation of the blocking DK-local contracts, and this Pack's separate execution approval:
 
 1. Represent the exact 21 variants as immutable DK-owned typed data keyed by the imported `variant_key`.
 2. Preserve the imported source identity and assertion projection; do not copy raw corpus prose or the full corpus into runtime source.
@@ -305,12 +319,14 @@ After project Pack 0019 acceptance and this Pack's separate execution approval:
 4. Use exactly five ordered scenario phases: prepare, reach component, exercise component lifecycle, observe safe results, cleanup.
 5. Use semantic/accessibility-first selectors owned under the ND Component. No unstable generated CSS path, database identifier, URL literal, translated free text, or personal/sensitive value may become an identity.
 6. Override only `metadataFor('nd-component-operations-health')` outside managed regions as `AutomationDisposition::AUTOMATED`, `EvidenceMode::NON_SENSITIVE_VISUAL`, and Browser capability. Keep every other keyed call on the generated `NOT_IMPLEMENTED`/`METADATA_ONLY` default.
-7. Provision only the two declared synthetic fixtures in dependency order and clean them in reverse order. Freeze and restore the synthetic clock.
+7. Implement `DK-DECISION-0003` through `OperationsHealthFixture` and a constructor-injected `DKSyntheticTargetControl` port. Acquire one exclusive lease owned by the exact `lifecycleId`, capture only a bounded baseline digest/count, freeze the clock inside the isolated target, provision `fixture.provider.enabled` then `fixture.health.evidence`, and return an opaque `ResourceReference` for every acquired resource, including partial acquisition on failure. Cleanup must remove evidence then provider, restore the target clock, prove baseline equality, close the lease, and account for every reference. Never delete by broad query or unverified ownership.
 8. Keep `provider_io=none`; do not call or expand the existing ND fake. Prove that Provider, notification, callback, queue, worker, scheduler, and external-network behavior do not occur.
 9. Keep product behavior read-only. Rendering, local focus, and viewport interactions must not generate a domain mutation or Audit.
 10. Increment the DK catalog version exactly once only when the externally visible executable contract changes.
-11. After project Pack 0020 acceptance, register one stateless `DKBrowserTargetRuntimeResolver` for App `dk`; it must validate the final provisioned `TargetContext` and exact `PrerequisiteExecutionData`, delegate opaque-handle resolution to an injected DK-owned boundary, create a fresh per-execution `DKBrowserTargetRuntime`, and retain no access-bearing value in the singleton registry/resolver.
-12. `DKBrowserTargetRuntime` may keep resolved access values only in private per-execution memory, prepare Browser-local session state, open only an allowlisted semantic surface key, and implement the accepted optional target-observer contract using exact DK-owned fact allowlists. It must expose no raw URL/session/reference getter, raw DOM/text/selector fact, array/JSON/serialization surface, or debug payload.
+11. Register one stateless `DKBrowserTargetRuntimeResolver` for App `dk` with the exact accepted signature `resolve(TargetContext $context, PrerequisiteExecutionData $prerequisites): BrowserTargetRuntime`; it must validate the final provisioned context and prerequisite data, delegate opaque-handle resolution to a constructor-injected DK-owned boundary, create a fresh per-execution `DKBrowserTargetRuntime`, and retain no access-bearing value in the singleton registry/resolver. Container lookup and service-location inside the resolver/runtime are forbidden.
+12. For this scenario group, `DKBrowserTargetRuntime` must implement both `BrowserTargetRuntime` and the otherwise optional `BrowserTargetObserver` extension. It may keep resolved access values only in private per-execution memory, prepare Browser-local session state, and open only an allowlisted semantic surface key. Its observer must return `BrowserTargetObservation` for the same requested key with an associative fact map of 1–16 entries; observation/fact keys must match `[a-z0-9][a-z0-9._-]*` with a maximum length of 64, and values must remain within the accepted boolean/null, bounded finite numeric, or grammar-constrained token-string contract. It must expose no raw URL/session/reference getter, raw DOM/text/selector fact, array/JSON/serialization surface, or debug payload.
+13. Scenario code must request the approved observation only through `TestContext::observeTarget($observationKey)`. It must not cast, downcall to, or directly obtain the runtime/observer. The final execution-normalized Pack must replace the descriptive UI statements in section 15 with one exact observation key, the complete fact-key set, and every allowed token value; none may be invented from this Draft.
+14. Target-clock control must be scoped to the run/session. If the target supports only a global clock, execution requires one exclusive isolated target instance and parallel runs are forbidden. TMS/PHPUnit time helpers may control unit-test time but do not satisfy target-clock control.
 
 ### Exact Variant Set
 
@@ -353,6 +369,7 @@ All 21 variants use the super-user persona, `fixture.health.evidence`, `provider
 - DK owns ND access resolution, scenario/selector/fixture/oracle/semantic mapping behavior; shared orchestration and Core Browser contracts remain target-neutral and project/Core-owned.
 - Generated metadata must support one executable scenario without creating duplicate descriptors or making unrelated scenarios executable after import replay.
 - Target references remain opaque. Scenario code receives exact identity through `TestContext`, opens the target only through `BrowserTargetRuntime`, and consumes only bounded semantic observations through the project-Pack-0020 contract; it must not receive prerequisite data, raw `TargetContext`, `ResourceReference`, DOM, text, selector, or access values.
+- The resolver/access boundary uses explicit constructor injection. Unit tests construct the resolver/runtime with small typed doubles and do not boot the Laravel container merely to discover dependencies.
 - No service locator, static mutable variant state, global current-variant variable, filesystem scan, database-defined executable workflow, or scenario-name parsing is allowed.
 - Do not bypass the target-resource lifecycle. Readiness, account/session resolution, fixture setup, final-context runtime resolution, execution, oracle, and cleanup remain ordered and fail closed.
 - Do not turn the existing ND fake into the target integration. No fake/API/callback/queue capability is added in this Pack.
@@ -366,6 +383,8 @@ All 21 variants use the super-user persona, `fixture.health.evidence`, `provider
 - Verify fixture dependency order, frozen time, reverse cleanup, baseline equality, and no cleanup of unrelated records.
 - Verify no Provider/fake/API/HTTP/callback/queue/worker/scheduler/external-network interaction occurs.
 - Verify safe results contain only bounded step names, stable error codes, durations, and full language-neutral hierarchy identity.
+- Verify the runtime resolver receives the exact same validated `PrerequisiteExecutionData` produced by prerequisite execution, creates a fresh runtime, and never resolves dependencies through global/container state.
+- Verify `TestContext::observeTarget()` is the only scenario observation path; the returned key exactly matches the requested key, facts satisfy the accepted 1–16 entry/key/value bounds, and the final DK schema rejects unknown keys or token values.
 - Verify no URL, session, cookie, credential, token, recipient, personal data, raw DOM, raw target reference, or target exception appears in descriptors, persisted test data, output, logs, or reports.
 - Verify PHP syntax, scoped formatting, focused tests, affected DK/project regressions, full suite, documentation/index consistency, and `git diff --check`.
 - Run real Browser variants only after the operator approves the exact isolated local synthetic target setup. Do not claim Browser E2E validation otherwise.
@@ -401,6 +420,8 @@ Security / Sensitive Data Impact: Yes
 | Scenario | Existing stable code | Expected behavior |
 |---|---|---|
 | missing/unknown/mismatched executable identity | `acceptance_configuration_invalid` | fail before Browser navigation; permanent; no target mutation |
+| missing/invalid target observer, invalid observation data, or returned-key mismatch | `acceptance_configuration_invalid` | fail closed through `TestContext::observeTarget()`; arbitrary observer exceptions are normalized; no raw target exception |
+| opaque target-access handle cannot be resolved by the approved DK boundary | `resource_unavailable` | fail before Browser start; retain no access-bearing value; cleanup any acquired reference |
 | account/session reference unavailable | `resource_unavailable` | fail at account stage; cleanup any acquired reference |
 | synthetic fixture setup fails | `fixture_setup_failed` | do not execute scenario; cleanup acquired references |
 | Browser cannot start | `acceptance_browser_start_failed` | preserve existing retry/admin classification; no raw exception |
@@ -426,8 +447,11 @@ Tests must prove every row above at its owning boundary, including failure stage
 ### Required Follow-up Updates
 
 - Accepted Run 001 for project Pack 0019 and confirmation that its implemented contract matches this normalized scope — completed 2026-10-11.
-- Project Pack 0020 Run 001 acceptance — completed 2026-10-11; Pack 0004 source-based renormalization remains blocking.
-- Exact runtime-only isolated local target startup/access procedure and DK-owned reference resolver at Pack 0004's pre-execution gate — blocking.
+- Project Pack 0020 Run 001 acceptance and Pack 0004 source-contract renormalization — completed 2026-10-11.
+- Exact runtime-only isolated local target startup/access procedure and constructor-injected DK-owned handle resolver at Pack 0004's pre-execution gate — blocking.
+- Fixture lease, target-clock, reverse-cleanup, baseline, ownership, and stable-error lifecycle — resolved by accepted `DK-DECISION-0003` on 2026-10-12.
+- Exact recipes for the five health cases and the concrete local synthetic target-control binding/path — blocking.
+- Exact observation key, fact/token schema, and stable source-owned selectors — blocking.
 - Operator-guide update only if the final local setup changes an operator workflow — conditionally blocking.
 
 ## 22. Data Model / Migration / Relationship Requirements
@@ -467,7 +491,7 @@ External Integration Fake/Mock Required: No new fake/mock; block stray external 
 Security/Secret Masking Tests Required: omission required
 ```
 
-Tests must follow nearby PHPUnit structure, use descriptive `test_...` names, Arrange/Act/Assert separation, exact `assertSame()`/subject-specific assertions, keyed data providers for uniform variant cases, fixed known expected values, frozen time, and independent setup.
+Tests must follow nearby PHPUnit structure, use descriptive `test_...` names, Arrange/Act/Assert separation, exact `assertSame()`/subject-specific assertions, keyed data providers for uniform variant cases, fixed known expected values, frozen time, and independent setup. Resolver/runtime unit tests must use direct construction with explicit typed doubles; they must not boot the application container or use a service locator merely to obtain dependencies.
 
 ### Behavior to Prove
 
@@ -475,6 +499,7 @@ Tests must follow nearby PHPUnit structure, use descriptive `test_...` names, Ar
 - only the selected scenario is executable;
 - locale/direction/theme/viewport/focus values reach the Browser context and scenario;
 - all five health-evidence cases produce their source-defined objective projection;
+- scenario observation occurs only through `TestContext::observeTarget()` with the exact approved observation key and bounded `BrowserTargetObservation` facts;
 - fixture/account/oracle/cleanup lifecycle is ordered and fail closed;
 - no API, fake expansion, Provider I/O, callback, queue, worker, scheduler, external HTTP, mutation Audit, or retained evidence occurs;
 - the other 138 scenarios and the total 139/24,668 catalog/mapping cardinalities remain unchanged.
@@ -486,8 +511,12 @@ Use only immutable synthetic records derived from the 21 accepted variant identi
 ## 25. Acceptance Checklist
 
 - [x] project Pack 0019 is implemented, validated, and Run 001 is accepted;
+- [x] project Pack 0020 is implemented, validated, and Run 001 is accepted;
 - [x] configuration-surface Remediation 0005 is accepted;
-- [ ] this Draft is renormalized against an accepted project Pack 0020 implementation; current file list is provisional and non-executable;
+- [x] this Draft is source-contract renormalized against the accepted project Pack 0020 implementation;
+- [x] the run-owned fixture lease, target-clock, reverse-cleanup, baseline, and ownership lifecycle is accepted in `DK-DECISION-0003`;
+- [x] exact five recipe keys, generic control binding, secret-handle boundary, and bounded observation schema are accepted in `DK-DECISION-0004`;
+- [ ] the three enabling Packs are accepted and their exact source signatures, deployment binding, and final Pack-0004 allowlist are incorporated; until then this Draft remains non-executable;
 - [ ] exact 21 variants exist once, in deterministic order, with no identity drift;
 - [ ] only `nd-component-operations-health` is executable and the other 138 remain non-executable;
 - [ ] each selected variant receives its exact identity and Browser context;
@@ -499,7 +528,7 @@ Use only immutable synthetic records derived from the 21 accepted variant identi
 - [ ] focused tests, affected regressions, full suite, PHP syntax, scoped formatting, safe scans, and diff checks pass;
 - [ ] all 21 actual Browser runs pass against the separately approved local synthetic target, or the Run is honestly reported as blocked/incomplete;
 - [ ] Run/index lifecycle documentation is synchronized;
-- [ ] no commit occurs without separate operator authorization.
+- [ ] no implementation commit occurs without separate operator authorization.
 
 ## 26. Tests to Add
 
@@ -517,11 +546,21 @@ Use only immutable synthetic records derived from the 21 accepted variant identi
 
 - Purpose: prove scenario metadata, ordered Steps, variant dispatch, objective assertions, and safe failures independently from a real target.
 - Behavior proven: selected scenario is Browser-automated/non-sensitive-visual; exact variant context drives viewport/locale/theme/case; critical failures stop appropriately; Step results contain only safe bounded fields.
-- Main assertions: exact metadata; exact ordered step names/results/codes; exact Browser-probe calls; no mutable/global current variant.
-- Required setup: accepted deterministic TestContext/browser doubles and one keyed data-provider case per distinct behavior.
+- Main assertions: exact metadata; exact ordered step names/results/codes; exact `observeTarget()` key and bounded returned facts; no direct runtime/observer access and no mutable/global current variant.
+- Required setup: accepted deterministic `TestContext`/Browser/observer doubles and one keyed data-provider case per distinct behavior.
 - Expected side effects: none outside the double.
 - Negative/error cases: unknown identity, unavailable observation, assertion mismatch, and closed page.
 - Related acceptance criteria: executable scenario behavior and safe output.
+
+### `OperationsHealthFixtureTest`
+
+- Purpose: prove the accepted run-owned lease, target-clock, fixture dependency, partial-failure, and cleanup contract without a real target.
+- Behavior proven: lease acquisition and bounded baseline precede target clock freeze; provider precedes health evidence; cleanup removes evidence then provider, restores the clock, verifies baseline equality, and closes the lease; all acquired references are reported.
+- Main assertions: exact call order and `lifecycleId`; constructor-injected fake control; opaque reference set; `fixture_setup_failed` preserves partial references; cleanup is idempotent only for the matching lease; no broad delete, raw data, Provider, queue, worker, scheduler, or network call.
+- Required setup: directly constructed `OperationsHealthFixture` with a small typed fake `DKSyntheticTargetControl`; fixed known clock/case inputs; no Laravel container, Browser, database, or target boot.
+- Expected side effects: none outside the fake.
+- Negative/error cases: lease conflict, clock-freeze failure, provider failure, evidence failure, ownership mismatch, clock-restore failure, baseline mismatch, cleanup timeout, and repeated matching cleanup.
+- Related acceptance criteria: `DK-DECISION-0003`, deterministic fixture lifecycle, failure safety, and complete cleanup.
 
 ### `NotificationDeliveryOperationsHealthAcceptanceTest`
 
@@ -535,29 +574,30 @@ Use only immutable synthetic records derived from the 21 accepted variant identi
 
 ### `DKBrowserTargetRuntimeTest`
 
-- Purpose: prove Browser preparation and semantic Operations Health navigation without exposing raw target access data.
-- Main assertions: preparation precedes Page use; only the allowlisted semantic surface opens; unknown surface and invalid final references fail safely; runtime cannot serialize or export raw values.
+- Purpose: prove Browser preparation, semantic Operations Health navigation, and bounded target observation without exposing raw target access data.
+- Main assertions: the runtime implements both accepted runtime and observer contracts; preparation precedes Page use; only the allowlisted semantic surface opens; the approved observation key returns an exact `BrowserTargetObservation`; fact keys/values remain within the 1–16 bounded contract; unknown surface/observation and invalid final references fail safely; runtime cannot serialize or export raw values.
 - Required setup: explicit Browser/Page doubles and inert synthetic reference sentinels; no real target.
 - Negative/error cases: missing/duplicate reference, unsupported surface, prepare/open failure, and leakage scan.
 
 ### `DKBrowserTargetRuntimeResolverTest`
 
-- Purpose: after project Pack 0020 acceptance, prove the final provisioned DK `TargetContext` plus exact validated `PrerequisiteExecutionData` become one per-execution runtime with exact identity and no singleton access-bearing state.
-- Main assertions: exact App/Component/Suite/Scenario/Variant validation; required reference types present; a fresh runtime per resolution; no fallback.
-- Required setup: final synthetic `TargetContext` values only; no Browser or Laravel target boot.
+- Purpose: prove the final provisioned DK `TargetContext` plus the exact validated `PrerequisiteExecutionData` become one per-execution runtime with exact identity and no singleton access-bearing state.
+- Main assertions: exact App/Component/Suite/Scenario/Variant validation; required reference types present; the exact prerequisite object reaches the injected owner adapter; a fresh runtime per resolution; no fallback or container lookup.
+- Required setup: final synthetic `TargetContext`, inert opaque `app-secret` handle, exact `PrerequisiteExecutionData`, and a constructor-injected fake target-access adapter; no Browser or Laravel target boot.
 - Negative/error cases: wrong identity, missing reference, unsafe/unknown reference type, and repeated resolution isolation.
 
 Existing DK catalog/target/component tests must be edited only for the normalized executable contract and must preserve all Pack-0001–0003 assertions.
 
 ## 27. Tests to Run
 
-After project Pack 0020 acceptance, DK Pack renormalization, Pack acceptance, and separate execution approval:
+After the blocking DK-local contracts and final exact allowlist are incorporated, Pack acceptance, and separate execution approval:
 
 1. `php -l` for every created/edited PHP file in the final normalized sections 8–9.
 2. Scoped `vendor/bin/pint --test` for the same files; any formatting write must stay within that final list.
 3. Focused PHPUnit:
    - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Catalogs/OperationsHealthVariantCatalogTest.php`
    - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Scenarios/NdComponentOperationsHealthTest.php`
+   - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Fixtures/OperationsHealthFixtureTest.php`
    - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeTest.php`
    - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeResolverTest.php`
    - `Modules/DK/tests/Feature/NotificationDeliveryOperationsHealthAcceptanceTest.php`
@@ -565,17 +605,21 @@ After project Pack 0020 acceptance, DK Pack renormalization, Pack acceptance, an
    - `Modules/DK/tests/Unit/DKTargetResourceAdapterTest.php`
    - `Modules/DK/tests/Feature/DKTargetFoundationIntegrationTest.php`
    - `Modules/DK/tests/Feature/NotificationDeliveryComponentIntegrationTest.php`
-4. The focused regression set named by accepted project Pack 0019 when its shared contract is consumed, without editing shared source through this DK Pack.
-5. The full PHPUnit suite after focused and cross-owner regressions pass.
-6. Guarded CLI list/plan checks restricted to the exact DK Component/Suite/Scenario so the 24,668-item catalog limit is not exceeded.
-7. Exactly 21 Browser Acceptance runs against the separately approved isolated local synthetic target, with cleanup verification after every run.
-8. Sensitive-value/external-I/O/managed-region/cardinality scans and `git diff --check`.
+4. Accepted Pack-0020 regression tests, without editing shared source through this DK Pack:
+   - `Modules/Core/tests/Unit/BrowserTargetObservationTest.php`
+   - `Modules/Core/tests/Unit/TestContextTargetObservationTest.php`
+   - `tests/Feature/AcceptanceBrowserRuntimeHandoffTest.php`
+5. The focused regression set named by accepted project Pack 0019 when its shared contract is consumed, without editing shared source through this DK Pack.
+6. The full PHPUnit suite after focused and cross-owner regressions pass.
+7. Guarded CLI list/plan checks restricted to the exact DK Component/Suite/Scenario so the 24,668-item catalog limit is not exceeded.
+8. Exactly 21 Browser Acceptance runs against the separately approved isolated local synthetic target, with cleanup verification after every run.
+9. Sensitive-value/external-I/O/managed-region/cardinality scans and `git diff --check`.
 
 Do not run browsers, target commands, database/fixture setup, queue workers, servers, Composer/npm, cache/config commands, or external network from this Draft.
 
 ## 28. Expected Output
 
-- an accepted project Pack 0020 prerequisite followed by one executable Browser scenario group with exactly 21 variants;
+- one executable Browser scenario group with exactly 21 variants consuming the accepted project Pack 0020 contracts;
 - five health-evidence cases plus the full 16-case presentation matrix;
 - per-scenario metadata and exact variant propagation through an accepted replay-safe shared contract;
 - isolated runtime-only synthetic target resources with complete cleanup;
@@ -592,7 +636,7 @@ Do not run browsers, target commands, database/fixture setup, queue workers, ser
 - Confirm project Change Request 0009 is approved and project Pack 0019 has an accepted valid Run.
 - Confirm project Decision 0021 / Change Request 0010 are approved and project Pack 0020 has an accepted valid Run.
 - Confirm accepted configuration-surface Remediation 0005 remains unchanged.
-- Confirm the exact normalized file list and runtime-only local synthetic target/session/fixture procedure without disclosing access-bearing values.
+- Confirm the exact final file list, constructor-injected `app-secret` handle resolver, runtime-only local synthetic target/session procedure, fixture/frozen-clock/cleanup mechanism, and observation key/fact/token/selector contract without disclosing access-bearing values.
 - Confirm Browser access is limited to the isolated local synthetic target and no real/staging/production/provider system is reachable.
 
 ### After AI Execution
@@ -633,7 +677,8 @@ No database migration or persistent evidence rollback exists.
 Stop before Pack acceptance or execution if:
 
 - project Pack 0019 lacks an accepted Run or its implemented contract changes the assumptions in sections 8–10;
-- project Pack 0020 lacks an accepted Run, or Pack 0004 has not been renormalized against its actual resolver/observer contracts;
+- accepted project Pack 0020 source no longer matches the resolver/observer assumptions recorded here;
+- any enabling Pack is unaccepted, its actual implementation contradicts Decisions 0022/DK 0003–0004, the deployment binding cannot be verified safely, or the final exact create/edit allowlist cannot be derived from the accepted implementations;
 - accepted configuration-surface files overlap this Pack or would need modification;
 - exact variant identity or safe target context cannot reach scenario execution without static/global state or manual managed-region edits;
 - importer replay would duplicate, overwrite, or demote the selected executable scenario;
@@ -650,14 +695,18 @@ Stop before Pack acceptance or execution if:
 
 Blocking before execution:
 
-1. Pack 0004 renormalization against the accepted actual project Pack 0020 resolver/observer source.
-2. Exact runtime-only isolated local target startup/access procedure, DK-owned opaque-reference resolver, and proof that neither can reach real/staging/production/provider systems.
+1. Accepted implementation evidence and exact version/capability signatures from Project Pack 0021, the target-project Acceptance Control Agent Pack, and the target ND Driver Pack.
+2. Verified deployment binding for the non-production HTTPS endpoint, secret provider, isolated target/database, and Browser lease-context handoff, recorded without values.
+3. Final exact sections 8–9 allowlist normalized to the accepted implementations.
 
 Resolved for normalization:
 
 - Change Request/Pack identifiers: project CR 0009 and Pack 0019.
-- Safe shared shape: exact identity in `TestContext`; after project Pack 0020 acceptance, target access only through a per-execution `BrowserTargetRuntime` resolved from final `TargetContext` plus exact validated `PrerequisiteExecutionData` by the App-keyed resolver registry.
+- Safe shared shape: exact identity in `TestContext`; target access only through a per-execution `BrowserTargetRuntime` resolved from final `TargetContext` plus exact validated `PrerequisiteExecutionData` by the App-keyed resolver registry; scenario observation only through `TestContext::observeTarget()` and bounded `BrowserTargetObservation`.
 - Missing shared capability routing: resolved and accepted through Decision 0021, Change Request 0010, and project Pack 0020 / Run 001.
+- Pack 0004 source-contract renormalization against the accepted resolver/observer implementation: completed 2026-10-11.
+- Run-owned fixture lease, target-clock, reverse-cleanup, baseline verification, ownership, partial-failure, and stable-error lifecycle: accepted in `DK-DECISION-0003` on 2026-10-12.
+- Generic target-control/DK adapter binding, five recipe keys, just-in-time secret-handle resolution, exact observation key, and sixteen-fact ceiling: accepted in `DK-DECISION-0004` on 2026-10-12.
 - DK adapter paths: `DKBrowserTargetRuntime` and `DKBrowserTargetRuntimeResolver` under `Acceptance/Shared/Target`.
 - Configuration: accepted Remediation 0005 and the existing `core.acceptance.*` surface.
 
