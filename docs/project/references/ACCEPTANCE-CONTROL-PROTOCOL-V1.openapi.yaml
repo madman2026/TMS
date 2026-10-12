@@ -1,0 +1,325 @@
+openapi: 3.1.0
+info:
+  title: TMS Acceptance Control Protocol
+  version: 1.0.0
+  description: >-
+    Private non-production control-plane contract for target-owned synthetic
+    fixture leases. Secret handles, secret values, target internals, and raw
+    fixture data are outside this contract.
+paths:
+  /_acceptance/v1/capabilities:
+    get:
+      operationId: getAcceptanceControlCapabilities
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProtocolHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+        - $ref: '#/components/parameters/RequestDigestHeader'
+        - $ref: '#/components/parameters/IdempotencyHeader'
+      responses:
+        '200':
+          description: Supported protocol, components, recipes, observations, and limits.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+        default:
+          $ref: '#/components/responses/Problem'
+  /_acceptance/v1/leases/{lifecycleId}:
+    parameters:
+      - $ref: '#/components/parameters/LifecycleId'
+      - $ref: '#/components/parameters/ProtocolHeader'
+      - $ref: '#/components/parameters/CorrelationHeader'
+      - $ref: '#/components/parameters/RequestDigestHeader'
+      - $ref: '#/components/parameters/IdempotencyHeader'
+    put:
+      operationId: acquireAcceptanceControlLease
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaseRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/LeaseResult'
+        '201':
+          $ref: '#/components/responses/LeaseResult'
+        default:
+          $ref: '#/components/responses/Problem'
+    get:
+      operationId: inspectAcceptanceControlLease
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/LeaseResult'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: cleanupAcceptanceControlLease
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaseRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/LeaseResult'
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Opaque
+      description: Deployment-resolved credential; never returned or persisted by TMS.
+  parameters:
+    LifecycleId:
+      name: lifecycleId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    ProtocolHeader:
+      name: X-Acceptance-Protocol
+      in: header
+      required: true
+      schema:
+        type: string
+        const: acceptance-control.v1
+    CorrelationHeader:
+      name: X-Acceptance-Correlation-Id
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    RequestDigestHeader:
+      name: X-Acceptance-Request-Digest
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/Digest'
+    IdempotencyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/Digest'
+  responses:
+    LeaseResult:
+      description: Bounded opaque lease state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LeaseResult'
+    Problem:
+      description: Safe stable protocol failure.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Token:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '^[a-z0-9][a-z0-9._-]*$'
+    Uuid:
+      type: string
+      format: uuid
+      pattern: '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
+    Digest:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+    FixedInstant:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+    Reference:
+      type: object
+      additionalProperties: false
+      required: [type, id, version]
+      properties:
+        type:
+          $ref: '#/components/schemas/Token'
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._~-]+$'
+        version:
+          type: integer
+          const: 1
+    ComponentCapability:
+      type: object
+      additionalProperties: false
+      required: [key, recipes, observations]
+      properties:
+        key:
+          $ref: '#/components/schemas/Token'
+        recipes:
+          type: array
+          minItems: 1
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Token'
+        observations:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Token'
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [protocol, server_version, max_lease_ttl_seconds, components]
+      properties:
+        protocol:
+          type: string
+          const: acceptance-control.v1
+        server_version:
+          $ref: '#/components/schemas/Token'
+        max_lease_ttl_seconds:
+          type: integer
+          minimum: 1
+          maximum: 900
+        components:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/ComponentCapability'
+    LeaseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - protocol
+        - lifecycle_id
+        - correlation_id
+        - app
+        - component
+        - recipe
+        - fixed_instant
+        - lease_ttl_seconds
+        - request_digest
+      properties:
+        protocol:
+          type: string
+          const: acceptance-control.v1
+        lifecycle_id:
+          $ref: '#/components/schemas/Uuid'
+        correlation_id:
+          $ref: '#/components/schemas/Uuid'
+        app:
+          $ref: '#/components/schemas/Token'
+        component:
+          $ref: '#/components/schemas/Token'
+        recipe:
+          $ref: '#/components/schemas/Token'
+        fixed_instant:
+          $ref: '#/components/schemas/FixedInstant'
+        lease_ttl_seconds:
+          type: integer
+          minimum: 1
+          maximum: 900
+        request_digest:
+          $ref: '#/components/schemas/Digest'
+    FactValue:
+      oneOf:
+        - type: 'null'
+        - type: boolean
+        - type: integer
+          minimum: -1000000000
+          maximum: 1000000000
+        - type: number
+          minimum: -1000000000
+          maximum: 1000000000
+        - $ref: '#/components/schemas/Token'
+    Observation:
+      type: object
+      additionalProperties: false
+      required: [key, facts]
+      properties:
+        key:
+          $ref: '#/components/schemas/Token'
+        facts:
+          type: object
+          minProperties: 1
+          maxProperties: 16
+          propertyNames:
+            $ref: '#/components/schemas/Token'
+          additionalProperties:
+            $ref: '#/components/schemas/FactValue'
+    LeaseResult:
+      type: object
+      additionalProperties: false
+      required:
+        - protocol
+        - lifecycle_id
+        - request_digest
+        - state
+        - references
+        - lease_context
+        - observation
+      properties:
+        protocol:
+          type: string
+          const: acceptance-control.v1
+        lifecycle_id:
+          $ref: '#/components/schemas/Uuid'
+        request_digest:
+          $ref: '#/components/schemas/Digest'
+        state:
+          type: string
+          enum: [active, cleaned, expired]
+        references:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Reference'
+        lease_context:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Reference'
+        observation:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Observation'
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, retryable]
+      properties:
+        type:
+          type: string
+          pattern: '^urn:tms:acceptance-control:error:target_control_[a-z_]+$'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 128
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          enum:
+            - target_control_unavailable
+            - target_control_unauthorized
+            - target_control_capability_mismatch
+            - target_control_lease_conflict
+            - target_control_recipe_rejected
+            - target_control_cleanup_failed
+            - target_control_protocol_invalid
+        retryable:
+          type: boolean

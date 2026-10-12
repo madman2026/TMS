@@ -1,6 +1,6 @@
 # AI-PACK-TMS-TARGET-CONTROL-PROTOCOL-0021 — Reusable target Acceptance Control protocol client
 
-Status: `draft — architecture and documentation commit approved; execution and implementation commit not authorized`
+Status: `accepted — technical validation passed; operator accepted and authorized implementation commit 2026-10-12`
 
 ## 1. Task ID
 
@@ -49,7 +49,7 @@ Portable target fixture/clock/cleanup control for Browser Acceptance.
 - `app/Acceptance/Targets/Control/Exceptions/TargetControlException.php`
 - `app/Acceptance/Targets/Control/Http/HttpTargetControlClient.php`
 - `app/Acceptance/Targets/Control/TargetControlProtocol.php`
-- `docs/project/ai/references/ACCEPTANCE-CONTROL-PROTOCOL-V1.openapi.yaml`
+- `docs/project/references/ACCEPTANCE-CONTROL-PROTOCOL-V1.openapi.yaml`
 - `tests/Unit/Acceptance/Targets/Control/TargetControlDataTest.php`
 - `tests/Unit/Acceptance/Targets/Control/HttpTargetControlClientTest.php`
 - `tests/Unit/Acceptance/Targets/Control/SecretHandleResolverContractTest.php`
@@ -58,7 +58,7 @@ Portable target fixture/clock/cleanup control for Browser Acceptance.
 ## 9. Files to Edit
 
 - `app/Providers/AppServiceProvider.php` only if a stateless default HTTP client binding is required
-- `docs/project/ai/references/REFERENCES-INDEX.md`
+- `docs/project/references/REFERENCES-INDEX.md`
 - `docs/project/ai/packs/AI-PACK-TMS-TARGET-CONTROL-PROTOCOL-0021.md`
 - `docs/project/ai/packs/PACKS-INDEX.md`
 - `docs/project/ai/runs/RUNS-INDEX.md` only after an approved Run exists
@@ -189,14 +189,14 @@ Obvious inert values only. Never use a real URL, token, certificate, account, or
 
 ## 25. Acceptance Checklist
 
-- [ ] exact files remain within scope;
-- [ ] OpenAPI and DTO/client behavior agree;
-- [ ] no target-specific internal appears in shared source;
-- [ ] secret non-exposure and retry/idempotency tests pass;
-- [ ] focused and full PHPUnit suites pass;
-- [ ] reference/Pack/Run indexes are synchronized;
-- [ ] no live target/network/Browser/database action occurred;
-- [ ] no implementation commit without separate authorization.
+- [x] exact files remain within scope;
+- [x] OpenAPI and DTO/client behavior agree;
+- [x] no target-specific internal appears in shared source;
+- [x] secret non-exposure and retry/idempotency tests pass;
+- [x] focused and full PHPUnit suites pass;
+- [x] authoritative reference/Pack/Run indexes are synchronized;
+- [x] no live target/network/Browser/database action occurred;
+- [x] no implementation commit without separate authorization.
 
 ## 26. Tests to Add
 
