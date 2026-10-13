@@ -293,6 +293,101 @@ final class HttpTargetControlClientTest extends TestCase
         $factory->assertNothingSent();
     }
 
+    #[DataProvider('allowedOriginProvider')]
+    public function test_explicit_local_loopback_option_accepts_only_supported_http_origins_and_preserves_https(
+        string $endpoint,
+        string $expectedOrigin,
+    ): void {
+        $factory = new Factory;
+        $factory->preventStrayRequests();
+        $request = $this->request();
+        $factory->fake([
+            '*' => Factory::response($this->lease($request), 200, ['Content-Type' => 'application/json']),
+        ]);
+        $client = new HttpTargetControlClient(
+            $factory,
+            new RecordingSecretHandleResolver,
+            allowLocalLoopbackHttp: true,
+        );
+
+        $result = $client->inspectLease(
+            $endpoint,
+            'app-secret://app-a/opaque-handle-a',
+            $request,
+        );
+
+        $this->assertSame('active', $result->state);
+        $factory->assertSentCount(1);
+        $factory->assertSent(
+            fn (Request $sent): bool => $sent->url() === $expectedOrigin.TargetControlProtocol::leasePath($request->lifecycleId),
+        );
+    }
+
+    public static function allowedOriginProvider(): iterable
+    {
+        yield 'IPv4 loopback HTTP' => ['http://127.0.0.1:8000', 'http://127.0.0.1:8000'];
+        yield 'localhost HTTP' => ['http://localhost:8000/', 'http://localhost:8000'];
+        yield 'IPv6 loopback HTTP' => ['http://[::1]:8000', 'http://[::1]:8000'];
+        yield 'HTTPS remains supported' => ['https://target.invalid', 'https://target.invalid'];
+    }
+
+    public function test_local_loopback_http_is_default_off_and_opt_in_remains_fail_closed(): void
+    {
+        $request = $this->request();
+        $strictFactory = new Factory;
+        $strictFactory->preventStrayRequests();
+        $strictResolver = new RecordingSecretHandleResolver;
+        $strictClient = new HttpTargetControlClient($strictFactory, $strictResolver);
+
+        try {
+            $strictClient->inspectLease(
+                'http://127.0.0.1:8000',
+                'app-secret://app-a/opaque-handle-a',
+                $request,
+            );
+            $this->fail('Default client accepted loopback HTTP.');
+        } catch (TargetControlException $exception) {
+            $this->assertSame('target_control_protocol_invalid', $exception->errorCode);
+        }
+
+        $strictFactory->assertNothingSent();
+        $this->assertSame(0, $strictResolver->calls);
+
+        $optedInFactory = new Factory;
+        $optedInFactory->preventStrayRequests();
+        $optedInResolver = new RecordingSecretHandleResolver;
+        $optedInClient = new HttpTargetControlClient(
+            $optedInFactory,
+            $optedInResolver,
+            allowLocalLoopbackHttp: true,
+        );
+
+        foreach ([
+            'http://192.168.1.10:8000',
+            'http://0.0.0.0:8000',
+            'http://127.0.0.1.invalid:8000',
+            'http://2130706433:8000',
+            'http://user@127.0.0.1:8000',
+            'http://127.0.0.1:8000/path',
+            'http://127.0.0.1:8000?query=value',
+            'http://127.0.0.1:8000#fragment',
+        ] as $endpoint) {
+            try {
+                $optedInClient->inspectLease(
+                    $endpoint,
+                    'app-secret://app-a/opaque-handle-a',
+                    $request,
+                );
+                $this->fail('Unsafe HTTP origin was accepted: '.$endpoint);
+            } catch (TargetControlException $exception) {
+                $this->assertSame('target_control_protocol_invalid', $exception->errorCode);
+            }
+        }
+
+        $optedInFactory->assertNothingSent();
+        $this->assertSame(0, $optedInResolver->calls);
+    }
+
     private function request(): TargetControlLeaseRequest
     {
         return new TargetControlLeaseRequest(

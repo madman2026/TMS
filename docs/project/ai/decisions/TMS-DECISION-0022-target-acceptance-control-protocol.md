@@ -1,6 +1,6 @@
 # TMS-DECISION-0022 — Versioned target Acceptance Control protocol
 
-Status: Accepted — operator approved the reusable Ports-and-Adapters design and its exact documentation commit on 2026-10-12; implementation, target access, execution, and implementation commit remain separately gated
+Status: Accepted and implemented by Pack 0021 — strict transport default extended only by accepted Decision 0023's explicit local-loopback HTTP option
 
 Scope: TMS project / cross-owner Acceptance target-control boundary
 
@@ -8,11 +8,11 @@ Source: Human Operator approval on 2026-10-12 after review of the proposed reusa
 
 Date: 2026-10-12
 
-Review At: Project Pack 0021 normalization and every protocol-major-version proposal
+Review At: every protocol-major-version or transport-boundary proposal
 
 Blocking: Yes for DK Pack 0004 target-control integration
 
-Closure Condition: accepted Project Pack 0021 Run plus one accepted target conformance implementation
+Closure Condition: accepted Project Pack 0021 Run plus one accepted target conformance implementation; local-loopback use additionally requires accepted Pack 0023
 
 Next Review At: before Project Pack 0021 execution approval
 
@@ -105,7 +105,8 @@ No TMS UI, Admin UI, translation, or public API behavior changes through this De
 
 ## future-work
 
-- Execute Project Pack 0021 only after its separate approval.
+- Project Pack 0021 / Run 001 is accepted and committed; preserve its target-neutral contract.
+- Accept Project Pack 0023 Run before any owner enables the exact local-loopback HTTP option.
 - Implement and accept the DK target's `acceptance-control.v1` server and ND component driver in their own repository/owner scopes.
 - Bind DK Pack 0004 to those accepted capabilities before Browser execution.
 - Propose `v2` rather than silently changing `v1` when an incompatible requirement appears.
@@ -114,12 +115,14 @@ No TMS UI, Admin UI, translation, or public API behavior changes through this De
 
 ```text
 Reviewed In: operator discussion of reusable target control, app-secret resolution, native ND fixture command reuse, and cross-system portability
-Review Result: Ports-and-Adapters, versioned HTTP/JSON protocol, target-owned lease/clock/driver registry, and just-in-time secret-handle resolution approved
+Review Result: Ports-and-Adapters, versioned HTTP/JSON protocol, target-owned lease/clock/driver registry, and just-in-time secret-handle resolution approved and implemented by accepted Pack 0021; Decision 0023 adds the bounded opt-in loopback transport
 Resolution: accepted
-Next Review At: Project Pack 0021 pre-execution gate
-Resolution Notes: This approval creates planning/governance records only. The operator separately authorized the exact documentation commit on 2026-10-12. No source implementation, target access, secret resolution, Browser run, fixture mutation, implementation commit, or push is authorized.
+Next Review At: Pack 0023 acceptance or any protocol/transport-boundary proposal
+Resolution Notes: Pack 0021 / Run 001 is accepted and committed. Concrete target access, owner-local binding, Browser execution, and target mutation remain separately gated.
 ```
 
 ## Notes
 
 The protocol standardizes orchestration semantics, not target internals. A non-Laravel target may implement the same contract with different persistence, command, and clock adapters.
+
+Decision 0023 does not replace this Decision. It preserves HTTPS as the default and permits HTTP only through a default-off constructor option for exact loopback origins.

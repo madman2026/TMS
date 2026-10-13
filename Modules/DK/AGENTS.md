@@ -21,4 +21,4 @@ Notification Delivery (ND) is reserved as a future Component inside DK. It is no
 
 The local profile tightens shared governance but does not replace it, override accepted Canonical decisions, or expand an approved Pack.
 
-Do not modify DK source or tests without an accepted DK-local Pack that explicitly lists those files. Do not access a real target or store target configuration or secrets. Do not commit without separate operator authorization.
+Do not modify DK source or tests without an accepted DK-local Pack that explicitly lists those files. Do not access production, staging, shared, real-data, or real-workload targets, and do not store secrets. An accepted DK Decision and Pack may authorize a same-workstation synthetic target and versioned non-sensitive loopback configuration; that exception must remain direct-loopback-only and fail closed elsewhere. Do not commit without separate operator authorization.

@@ -6,7 +6,7 @@ Add the target-neutral Acceptance Control client, protocol contract, and just-in
 
 ## 2. Status
 
-Approved planning change — implementation is assigned to draft Project Pack 0021 and remains separately gated.
+Implemented and accepted through Project Pack 0021 / Run 001; transport default is extended only by Change Request 0012 and Decision 0023.
 
 ## 3. Related Release / Phase
 
@@ -49,7 +49,7 @@ No remediation or TMS data migration. Each target implementation needs its own s
 
 ## 12. Required Human Approval
 
-Architecture, documentation creation, and the exact documentation commit are approved. Pack execution, target/network access, secret-provider binding, tests that call a target, implementation commit, and push require separate approval.
+Architecture and Project Pack 0021 implementation/Run/commit are accepted. Target/network access, concrete secret-provider binding, tests that call a target, owner-local activation, Browser execution, and push remain separately gated.
 
 ## 13. Acceptance Criteria
 
@@ -66,7 +66,7 @@ Remove only Pack-0021-created client/protocol files and composition registration
 
 ## 15. Final Decision
 
-Approved for a separately executed implementation Pack.
+Implemented and accepted through Project Pack 0021. The exact opt-in local-loopback HTTP extension is owned by Change Request 0012 / Project Pack 0023.
 
 ## 16. Required remediation
 

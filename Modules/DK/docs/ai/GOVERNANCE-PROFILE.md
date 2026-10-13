@@ -24,6 +24,6 @@ DK-owned documentation covers module-specific design, behavior, lifecycle, refer
 - Read only the owner-local records needed for the active task.
 - Do not infer authority from an empty index or an uncreated path.
 - Require an accepted DK-local Pack before modifying DK source, tests, configuration, or generated artifacts after bootstrap acceptance.
-- Restrict future target work to approved testing or staging environments with synthetic data.
-- Never access a real target or include real credentials, tokens, accounts, URLs, selectors, payloads, personal data, production values, or environment values in DK source or documentation.
+- Restrict future target work to approved testing environments with synthetic data; staging requires a separately approved strict profile.
+- Never access production, staging, shared, real-data, or real-workload targets or include real credentials, tokens, accounts, sessions, selectors, payloads, personal data, production values, or environment values in DK source or documentation. An accepted DK Decision/Pack may version a fixed non-sensitive direct-loopback development origin and public marker for a same-workstation synthetic target; this never authorizes LAN or remote access.
 - Record unresolved cross-boundary observations at project level until ownership is separately decided.

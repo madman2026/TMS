@@ -23,6 +23,7 @@ This index owns TMS project-wide and repository-governance Pack navigation. Modu
 | Bounded Browser Acceptance execution context (0019) | accepted — validation passed; operator accepted Run 001 and authorized commit 2026-10-11 | `docs/project/ai/packs/AI-PACK-TMS-ACCEPTANCE-EXECUTION-CONTEXT-0019.md` |
 | Bounded target runtime input and semantic Browser observation (0020) | accepted — implementation and validation passed; operator accepted Run 001 and authorized commit 2026-10-11 | `docs/project/ai/packs/AI-PACK-TMS-TARGET-RUNTIME-OBSERVATION-0020.md` |
 | Reusable target Acceptance Control protocol client (0021) | accepted — technical validation passed; operator accepted and authorized implementation commit 2026-10-12 | `docs/project/ai/packs/AI-PACK-TMS-TARGET-CONTROL-PROTOCOL-0021.md` |
+| Opt-in local-loopback HTTP target-control transport (0023) | accepted — technical validation passed; Run 001 accepted and implementation commit authorized 2026-10-13 | `docs/project/ai/packs/AI-PACK-TMS-TARGET-CONTROL-LOCAL-LOOPBACK-0023.md` |
 
 Read only the current Pack required for the active task. An executed Pack and Run remain unaccepted until the operator completes the stated acceptance gate.
 

@@ -28,6 +28,7 @@ final readonly class HttpTargetControlClient implements TargetControlClient
         private int $timeoutSeconds = 10,
         private int $maxAttempts = 2,
         private int $maxResponseBytes = TargetControlProtocol::MAX_RESPONSE_BYTES,
+        private bool $allowLocalLoopbackHttp = false,
     ) {
         if ($connectTimeoutSeconds < 1 || $connectTimeoutSeconds > 10
             || $timeoutSeconds < $connectTimeoutSeconds || $timeoutSeconds > 30
@@ -415,7 +416,6 @@ final readonly class HttpTargetControlClient implements TargetControlClient
     {
         $parts = parse_url($endpoint);
         if (! is_array($parts)
-            || ($parts['scheme'] ?? null) !== 'https'
             || ! isset($parts['host'])
             || isset($parts['user'])
             || isset($parts['pass'])
@@ -425,10 +425,20 @@ final readonly class HttpTargetControlClient implements TargetControlClient
             throw TargetControlException::because('target_control_protocol_invalid');
         }
 
+        $scheme = $parts['scheme'] ?? '';
         $host = strtolower($parts['host']);
+        $isHttps = $scheme === 'https';
+        $isAllowedLoopbackHttp = $scheme === 'http'
+            && $this->allowLocalLoopbackHttp
+            && in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true);
+
+        if (! $isHttps && ! $isAllowedLoopbackHttp) {
+            throw TargetControlException::because('target_control_protocol_invalid');
+        }
+
         $port = isset($parts['port']) ? ':'.$parts['port'] : '';
 
-        return 'https://'.$host.$port;
+        return $scheme.'://'.$host.$port;
     }
 
     private function assertSecretHandle(string $secretHandle, string $appKey): void

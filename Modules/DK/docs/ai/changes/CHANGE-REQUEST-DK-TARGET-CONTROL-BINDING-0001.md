@@ -6,7 +6,7 @@ Replace Pack 0004's unresolved direct target-control concept with the accepted g
 
 ## 2. Status
 
-Approved planning change — Pack 0004 normalization is authorized; source execution remains blocked on the three enabling Packs and a separate operator gate.
+Approved planning change — generic binding retained and local deployment assumptions superseded by Change Request 0003; source execution remains separately gated.
 
 ## 3. Related Release / Phase
 
@@ -18,7 +18,7 @@ Accepted `DK-DECISION-0004` and project `TMS-DECISION-0022`.
 
 ## 5. Proposed Change
 
-Add a DK adapter over the shared Target Control client, map the five Operations Health cases to stable recipes, resolve `app-secret` handles just in time through the shared port, consume the target's opaque lease context, and use one bounded semantic observation contract.
+Add a DK adapter over the shared Target Control client, map the five Operations Health cases to stable recipes, resolve `app-secret` handles just in time through the shared port, consume the target's opaque lease context, and use one bounded semantic observation contract. For the approved local profile, the handle resolves to the non-secret public marker defined by Change Request 0003 and Decision 0005.
 
 ## 6. Reason for Change
 
@@ -38,7 +38,7 @@ Existing DK Packs 0001–0003, 139 scenario identities, 24,668 mappings, and 138
 
 ## 10. Risk Level
 
-Medium due to secret-bound authenticated control, target mutation, frozen time, and cleanup; mitigated by owner separation, isolated target, lease ownership, bounded observations, and fail-closed gates.
+Medium due to authenticated control, target mutation, frozen time, and cleanup; mitigated by owner separation, direct-loopback restriction, explicit no-real-data target, lease ownership, bounded observations, and fail-closed gates.
 
 ## 11. Migration or Remediation Needed
 
@@ -52,7 +52,7 @@ Documentation normalization and its exact documentation commit are approved. Pac
 
 - Five recipe keys and one observation schema match Decision 0004 exactly.
 - TMS has no command/schema/model/database knowledge.
-- The DK adapter resolves the handle only through the injected port and never retains or emits the secret.
+- The DK adapter resolves the handle only through the injected port and never retains or emits the resolved value; the local profile's resolved public marker is not a secret.
 - Lease-context reference remains opaque; every target resource is cleaned and baseline-equal.
 - Only the selected 21 variants become executable after Pack 0004.
 - Enabling Pack versions/capabilities are checked before any target access.
@@ -63,7 +63,7 @@ Revert only Pack-0004-owned DK adapter/scenario/test edits and restore its fail-
 
 ## 15. Final Decision
 
-Approved for Pack 0004 normalization; execution remains blocked.
+Approved for Pack 0004 normalization; local deployment details are governed by Change Request 0003 and Decision 0005; execution remains gated.
 
 ## 16. Required remediation
 
@@ -71,4 +71,4 @@ None. The Pack is unexecuted; this is prospective normalization.
 
 ## 17. Notes
 
-The accepted target ND export remains source/traceability input; it is not a control-plane implementation.
+The accepted target ND export remains source/traceability input; it is not a control-plane implementation. The local-loopback profile is additive and does not weaken strict remote-target requirements.
