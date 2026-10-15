@@ -11,7 +11,10 @@ return new class extends Migration
         Schema::create('acceptance_operation_approvals', function (Blueprint $table): void {
             $table->id();
             $table->foreignUuid('acceptance_operation_request_id')
-                ->constrained('acceptance_operation_requests')->restrictOnDelete()->cascadeOnUpdate();
+                ->constrained(
+                    'acceptance_operation_requests',
+                    indexName: 'acceptance_approval_request_foreign',
+                )->restrictOnDelete()->cascadeOnUpdate();
             $table->string('scope', 64);
             $table->string('schema_version', 64);
             $table->char('input_fingerprint', 64);
