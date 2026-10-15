@@ -1,6 +1,6 @@
 # AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004 — First bounded Notification Delivery Operations Health Browser Acceptance group
 
-Status: `normalized draft — target Binding Pack 0002 and TMS Pack 0023 / Run 001 accepted 2026-10-13; awaiting separate DK source-execution and target-access gates`
+Status: `accepted — source, automated, exact 21-variant live Browser, Batch, and cleanup validation passed; operator accepted and authorized scoped commits on 2026-10-15`
 
 Generated: `2026-10-11`
 
@@ -8,7 +8,7 @@ Owner: DK
 
 Decision: accepted project Decisions 0005, 0007, 0012, 0015, temporary 0017, 0021, and 0022; accepted `DK-DECISION-0001` through `DK-DECISION-0005`.
 
-Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Packs 0019–0021 and their accepted Runs; accepted configuration-surface Remediation 0005; accepted target-project Acceptance Control Agent Pack and target ND Operations Health Driver Pack; accepted target-project local-loopback Change Request/Decision and Binding Pack 0002 source Run; accepted TMS Project Pack 0023 Run; accepted Decisions 0022–0023 and DK 0003–0005; and separate DK source, target, Browser, acceptance, and commit gates.
+Depends On: accepted DK Packs 0001–0003 and their accepted Runs; accepted project Packs 0019–0021 and their accepted Runs; accepted configuration-surface Remediation 0005; accepted target-project Acceptance Control Agent Pack and target ND Operations Health Driver Pack; accepted target-project local-loopback Change Request/Decision and Binding Pack 0002 source Run; accepted TMS Project Pack 0023 Run; accepted Decisions 0022–0023 and DK 0003–0005; and separate DK target-access, Browser, acceptance, and commit gates.
 
 Documentation commit: authorized on 2026-10-12. Acceptance, execution, target access, tests that launch a browser or connect to a target, and the later implementation commit each retain separate operator gates.
 
@@ -47,7 +47,7 @@ The original normalized Draft identified three contract gaps:
 
 The first two gaps and the replay-safe generated migration were implemented and accepted through Change Request 0009, project Pack 0019, and Run 001. Pre-execution source inspection on 2026-10-11 then found two additional shared gaps: the runtime resolver did not receive the validated prerequisite handles needed by a target-owned access resolver, and Core had no bounded target-semantic observation port for the required computed/effective/freshness/reason/source facts. Accepted Decision 0021, Change Request 0010, and project Pack 0020 own those shared changes; Pack 0020 / Run 001 is now implemented, validated, and accepted. DK still owns concrete access resolution, selectors, fixtures, observations, oracle, and cleanup. Manual edits inside generated managed regions remain forbidden because Pack-0003 import replay must remain deterministic and idempotent.
 
-Configuration-surface Remediation 0005 and project Packs 0019–0023 / their applicable accepted Runs are complete. The target-project Agent, N-D Operations Health Driver, and Binding Pack 0002 source Run are accepted and their actual contracts were inspected. TMS Project Pack 0023 / Run 001 is accepted and provides the explicit shared-client loopback HTTP option. This Draft is normalized against those implementations and the accepted shared resolver/observation source. `DK-DECISION-0003` fixes the run-owned fixture lease, target-clock, reverse-cleanup, and baseline-verification lifecycle; `DK-DECISION-0004` fixes the generic protocol/DK adapter, five recipes, just-in-time handle resolution, and bounded observation schema; `DK-DECISION-0005` binds the same-workstation local-loopback endpoint and public marker. Pack 0004 now awaits only its separate source-execution and target-access gates before execution begins.
+Configuration-surface Remediation 0005 and project Packs 0019–0023 / their applicable accepted Runs are complete. The target-project Agent, N-D Operations Health Driver, and Binding Pack 0002 source Run are accepted and their actual contracts were inspected. TMS Project Pack 0023 / Run 001 is accepted and provides the explicit shared-client loopback HTTP option. This Pack is normalized against those implementations and the accepted shared resolver/observation source. `DK-DECISION-0003` fixes the run-owned fixture lease, target-clock, reverse-cleanup, and baseline-verification lifecycle; `DK-DECISION-0004` fixes the generic protocol/DK adapter, five recipes, just-in-time handle resolution, and bounded observation schema; `DK-DECISION-0005` binds the same-workstation local-loopback endpoint and public marker. Pack 0004 source implementation and automated validation completed on 2026-10-14. Separate local target-access and Browser-execution approval is still required before the 21 real Browser runs begin.
 
 ## 5. Related Release / Phase
 
@@ -124,6 +124,8 @@ The intended DK-local edit boundary is:
 - `Modules/DK/tests/Unit/DKTargetResourceAdapterTest.php`;
 - `Modules/DK/tests/Feature/DKTargetFoundationIntegrationTest.php`;
 - `Modules/DK/tests/Feature/NotificationDeliveryComponentIntegrationTest.php`;
+- `Modules/DK/tests/Feature/NotificationDeliveryCorpusImportTest.php` — preserve the exact one-executable/138-skeleton post-Pack contract;
+- `tests/Feature/DKModuleBootstrapTest.php` — catalog-version expectation only, `v3` to `v4`;
 - `Modules/DK/docs/ai/packs/AI-PACK-DK-NOTIFICATION-DELIVERY-OPERATIONS-HEALTH-ACCEPTANCE-0004.md` — normalization/lifecycle only;
 - `Modules/DK/docs/ai/packs/PACKS-INDEX.md`;
 - `Modules/DK/docs/ai/runs/RUNS-INDEX.md` — only after an approved Run Report exists.
@@ -227,7 +229,7 @@ The control origin and public marker are fixed and non-sensitive; the target-iss
 
 ```text
 Validation required:
-- Config keys checked: Yes, by accepted Remediation 0005; no Pack-owned changes
+- Config keys checked: Yes — Pack-owned disabled-by-default local-loopback defaults are validated by the DK provider/tests; shared Core config remains unchanged
 - Env placeholders documented: Not applicable
 - Admin settings created or documented: Not applicable
 - Sensitive settings masked: Omitted; raw values forbidden
@@ -255,13 +257,13 @@ Operator manual setup is required before the real Browser run and must be stated
 
 ## 13. Clarification Questions Before Implementation
 
-The shared contract and configuration questions are resolved by approved Change Requests 0009–0010, accepted project Packs 0019–0020, and accepted Remediation 0005. Source-contract renormalization is complete. Before Pack 0004 can be accepted or executed, the operator must still confirm:
+The shared contract and configuration questions are resolved by approved Change Requests 0009–0010, accepted project Packs 0019–0020, and accepted Remediation 0005. Source-contract renormalization and source implementation are complete. Before Pack 0004 can be accepted or target-executed, the operator must still confirm:
 
 1. project Pack 0019 has accepted Run 001 and its implemented contract matches this normalized scope — confirmed 2026-10-11;
 2. project Pack 0020 has an accepted Run and its actual resolver/observer source matches Decision 0021 — confirmed 2026-10-11;
 3. the target is `http://127.0.0.1:8000` on the same workstation, the exact local handle maps to the approved public marker, and session/lease-context values remain absent from source, docs, chat output, logs, and persisted Test/Step data — profile approved; shared-client HTTP support accepted through Pack 0023 / Run 001;
-4. the fixture lease lifecycle in `DK-DECISION-0003` is accepted — confirmed 2026-10-12; the exact five-case recipes and concrete local target-control binding/path remain to be approved;
-5. one exact observation key, the complete bounded fact-key set, every allowed token value, and the stable source-owned semantic selectors are approved for the five health cases and presentation matrix;
+4. the fixture lease lifecycle in `DK-DECISION-0003` is accepted — confirmed 2026-10-12; the exact five-case recipes and concrete local target-control binding are implemented and source-validated 2026-10-14;
+5. one exact observation key, the complete bounded fact-key set, every allowed token value, and the stable source-owned semantic selectors are implemented and source-validated for the five health cases and presentation matrix;
 6. the Browser can reach only that local target and every run-owned reference can be deterministically cleaned.
 
 ## 14. Multilingual / Translation Requirements
@@ -307,16 +309,16 @@ No screenshot, video, trace, HAR, raw DOM, console, or network artifact is retai
 ## 16. Operator Documentation Requirements
 
 ```text
-Operator Documentation Impact: No current command/workflow change
-Operator Documentation Update Required: Not applicable for this Draft
+Operator Documentation Impact: No current command/workflow change; target profile remains disabled by default
+Operator Documentation Update Required: Not applicable for source implementation
 Guide File: docs/project/ai/guides/ACCEPTANCE-CLI.fa.md
 ```
 
-No operator-facing behavior changes in this Draft. If the accepted enabling/target-integration work introduces a new setup, command option, or troubleshooting path, the owning Pack must update the Persian guide before Pack 0004 can be accepted.
+No operator-facing workflow changes are introduced by this source implementation. If approved target execution introduces a new setup, command option, or troubleshooting path, the owning Pack must update the Persian guide before Pack 0004 can be accepted.
 
 ## 17. Implementation Rules
 
-After accepted project Packs 0019–0020, incorporation of the blocking DK-local contracts, and this Pack's separate execution approval:
+With accepted project Packs 0019–0020 and the blocking DK-local contracts incorporated, the source implementation follows these rules; actual Browser execution retains its separate approval gate:
 
 1. Represent the exact 21 variants as immutable DK-owned typed data keyed by the imported `variant_key`.
 2. Preserve the imported source identity and assertion projection; do not copy raw corpus prose or the full corpus into runtime source.
@@ -526,18 +528,18 @@ Use only immutable synthetic records derived from the 21 accepted variant identi
 - [x] project Pack 0021, target Agent, and target N-D driver are accepted and their exact contracts are incorporated;
 - [x] the target local-loopback deployment profile is approved and the Pack-0004 owner-local allowlist is normalized;
 - [x] target Binding Pack 0002 source Run and TMS Pack 0023 / Run 001 are accepted before DK source execution;
-- [ ] exact 21 variants exist once, in deterministic order, with no identity drift;
-- [ ] only `nd-component-operations-health` is executable and the other 138 remain non-executable;
-- [ ] each selected variant receives its exact identity and Browser context;
-- [ ] five component cases and the complete 16-case presentation matrix pass objective assertions;
-- [ ] fixture/account/oracle/cleanup lifecycle is synthetic, isolated, ordered, and complete;
-- [ ] import replay is idempotent and preserves executable metadata without duplicate managed lines;
-- [ ] no API/Fake/Provider/callback/queue/worker/scheduler/external-network scope was added;
-- [ ] no product mutation, mutation Audit, unrelated cleanup, or retained evidence occurred;
-- [ ] focused tests, affected regressions, full suite, PHP syntax, scoped formatting, safe scans, and diff checks pass;
-- [ ] all 21 actual Browser runs pass against the separately approved local synthetic target, or the Run is honestly reported as blocked/incomplete;
-- [ ] Run/index lifecycle documentation is synchronized;
-- [ ] no implementation commit occurs without separate operator authorization.
+- [x] exact 21 variants exist once, in deterministic order, with no identity drift;
+- [x] only `nd-component-operations-health` is executable and the other 138 remain non-executable;
+- [x] each selected variant receives its exact identity and Browser context in source-level contract tests;
+- [x] five component cases and the complete 16-case presentation matrix pass objective assertions;
+- [x] fixture/account/oracle/cleanup lifecycle is synthetic, isolated, ordered, and complete;
+- [x] import replay is idempotent and preserves executable metadata without duplicate managed lines;
+- [x] no API/Fake/Provider/callback/queue/worker/scheduler/external-network scope was added;
+- [x] no product mutation, mutation Audit, unrelated cleanup, or retained evidence occurred during source implementation and automated validation;
+- [x] focused tests, affected regressions, full suite, PHP syntax, scoped formatting with the existing canonical managed-source Pint/validator exception, safe scans, and diff checks pass for source implementation;
+- [x] all 21 actual Browser runs pass against the separately approved local synthetic target;
+- [x] Run/index lifecycle documentation is synchronized;
+- [x] operator accepted the result and authorized scoped commits on 2026-10-15.
 
 ## 26. Tests to Add
 
@@ -599,7 +601,7 @@ Existing DK catalog/target/component tests must be edited only for the normalize
 
 ## 27. Tests to Run
 
-After the blocking DK-local contracts and final exact allowlist are incorporated, Pack acceptance, and separate execution approval:
+Source validation uses steps 1–7 and 9 below. Step 8 requires separate target-access and Browser-execution approval:
 
 1. `php -l` for every created/edited PHP file in the final normalized sections 8–9.
 2. Scoped `vendor/bin/pint --test` for the same files; any formatting write must stay within that final list.
@@ -609,7 +611,7 @@ After the blocking DK-local contracts and final exact allowlist are incorporated
    - `Modules/DK/tests/Unit/Acceptance/Components/NotificationDelivery/Fixtures/OperationsHealthFixtureTest.php`
    - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeTest.php`
    - `Modules/DK/tests/Unit/Acceptance/Shared/Target/DKBrowserTargetRuntimeResolverTest.php`
-- `Modules/DK/tests/Unit/Acceptance/Shared/Target/LocalLoopbackSecretHandleResolverTest.php`
+   - `Modules/DK/tests/Unit/Acceptance/Shared/Target/LocalLoopbackSecretHandleResolverTest.php`
    - `Modules/DK/tests/Feature/NotificationDeliveryOperationsHealthAcceptanceTest.php`
    - `Modules/DK/tests/Unit/DKAcceptanceAppTest.php`
    - `Modules/DK/tests/Unit/DKTargetResourceAdapterTest.php`
@@ -708,7 +710,7 @@ Blocking before execution:
 
 1. Accepted target-project Binding Pack 0002 source Run for the approved local-loopback profile — complete 2026-10-13.
 2. Accepted TMS Project Pack 0023 / Run 001 for the default-off exact-loopback HTTP option — complete 2026-10-13.
-3. Separate DK Pack 0004 source, target-access, Browser, acceptance, and commit gates.
+3. Separate DK Pack 0004 target-access, Browser, acceptance, and commit gates — source-execution gate approved and completed 2026-10-14.
 
 Resolved for normalization:
 
@@ -728,3 +730,7 @@ Deferred by `DK-DECISION-0002`, not blocking this Draft:
 - ND fake expansion or new fake behaviors;
 - additional bounded ND scenario groups;
 - stage-15 full coverage reconciliation.
+
+## 35. Remediation Note — 2026-10-14
+
+Post-source review found that the selected 21 `VariantDescriptor` instances still inherited `PrerequisiteSchema::none()`, while the already accepted adapter/fixture/runtime contract required `secretReferences['credential']`. Approved Change Request 0004 and DK Remediation 0001 corrected that producer-side omission through a non-managed, replay-safe variant hook backed by `OperationsHealthVariantCatalog`. The generated variants region remained byte-identical, all automated validation passed, and no target or Browser was accessed. Real target/Browser execution and the Pack acceptance/commit gates remain open.

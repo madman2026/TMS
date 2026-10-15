@@ -44,6 +44,11 @@ class DKTargetFoundationIntegrationTest extends TestCase
         $this->assertSame([
             'enabled' => false,
             'environment' => 'unknown',
+            'control' => [
+                'profile' => 'local-loopback',
+                'endpoint' => 'http://127.0.0.1:8000',
+                'secret_handle' => 'app-secret://dk/local-acceptance-control-v1',
+            ],
         ], $this->app->make('config')->get('dk.target'));
 
         $appRegistry = $this->app->make(AcceptanceAppRegistry::class);
@@ -62,6 +67,35 @@ class DKTargetFoundationIntegrationTest extends TestCase
             $this->fail('Expected the DK target aggregate registration to reject duplication.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('target_resource_registry_duplicate', $exception->getMessage());
+        }
+    }
+
+    public function test_process_local_profile_activates_only_the_exact_testing_value(): void
+    {
+        $previous = getenv('DK_ACCEPTANCE_TARGET_PROFILE');
+
+        try {
+            putenv('DK_ACCEPTANCE_TARGET_PROFILE=local-testing');
+            $active = require base_path('Modules/DK/config/config.php');
+
+            $this->assertTrue($active['target']['enabled']);
+            $this->assertSame('testing', $active['target']['environment']);
+
+            putenv('DK_ACCEPTANCE_TARGET_PROFILE=staging');
+            $invalid = require base_path('Modules/DK/config/config.php');
+
+            $this->assertFalse($invalid['target']['enabled']);
+            $this->assertSame('unknown', $invalid['target']['environment']);
+
+            putenv('DK_ACCEPTANCE_TARGET_PROFILE');
+            $default = require base_path('Modules/DK/config/config.php');
+
+            $this->assertFalse($default['target']['enabled']);
+            $this->assertSame('unknown', $default['target']['environment']);
+        } finally {
+            $previous === false
+                ? putenv('DK_ACCEPTANCE_TARGET_PROFILE')
+                : putenv('DK_ACCEPTANCE_TARGET_PROFILE='.$previous);
         }
     }
 

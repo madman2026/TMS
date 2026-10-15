@@ -43,7 +43,7 @@ final class NotificationDeliveryComponentIntegrationTest extends TestCase
         $this->assertSame($provider, $this->app->make(NotificationProvider::class));
 
         $this->assertSame(['dk'], $catalog->appKeys());
-        $this->assertSame('v3', $catalog->version('dk'));
+        $this->assertSame('v4', $catalog->version('dk'));
         $this->assertSame(
             ['notification-delivery'],
             array_map(static fn ($component): string => $component->key, iterator_to_array($catalog->components('dk'))),
@@ -51,13 +51,14 @@ final class NotificationDeliveryComponentIntegrationTest extends TestCase
         $this->assertCount(10, iterator_to_array($catalog->suites('dk')));
         $descriptors = iterator_to_array($catalog->descriptors('dk'));
         $this->assertCount(139, $descriptors);
-        $this->assertSame(
-            [AutomationDisposition::NOT_IMPLEMENTED->value],
-            array_values(array_unique(array_map(
-                static fn ($descriptor): string => $descriptor->metadata->disposition->value,
-                $descriptors,
-            ))),
-        );
+        $this->assertCount(1, array_filter(
+            $descriptors,
+            static fn ($descriptor): bool => $descriptor->metadata->disposition === AutomationDisposition::AUTOMATED,
+        ));
+        $this->assertCount(138, array_filter(
+            $descriptors,
+            static fn ($descriptor): bool => $descriptor->metadata->disposition === AutomationDisposition::NOT_IMPLEMENTED,
+        ));
         $this->assertSame([], iterator_to_array($catalog->variants('dk', 'missing-scenario')));
         $this->assertCount(
             24668,

@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace Modules\DK\Tests\Unit;
 
 use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
+use App\Acceptance\Targets\Control\Data\TargetControlLeaseResult;
+use App\Acceptance\Targets\Control\TargetControlProtocol;
 use App\Acceptance\Targets\Data\ResourceReference;
 use App\Acceptance\Targets\Data\TargetContext;
 use App\Acceptance\Targets\Data\TargetEnvironment;
 use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Catalogs\OperationsHealthVariantCatalog;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Data\OperationsHealthVariant;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Fixtures\OperationsHealthFixture;
+use Modules\DK\Acceptance\Shared\Target\Contracts\DKSyntheticTargetControl;
 use Modules\DK\Acceptance\Shared\Target\DKTargetProfile;
 use Modules\DK\Acceptance\Shared\Target\DKTargetResourceAdapter;
+use Modules\DK\Acceptance\Shared\Target\LocalLoopbackSecretHandleResolver;
 use PHPUnit\Framework\TestCase;
 
 class DKTargetResourceAdapterTest extends TestCase
@@ -91,9 +98,95 @@ class DKTargetResourceAdapterTest extends TestCase
         $this->assertSame([$reference], $contextWithReference->references);
     }
 
-    private function adapter(bool $enabled, TargetEnvironment $environment): DKTargetResourceAdapter
+    public function test_selected_operations_health_lifecycle_resolves_provisions_oracles_and_cleans(): void
     {
-        return new DKTargetResourceAdapter(new DKTargetProfile($enabled, $environment));
+        $control = new class implements DKSyntheticTargetControl
+        {
+            /** @var list<string> */
+            public array $calls = [];
+
+            public function acquire(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle): TargetControlLeaseResult
+            {
+                $this->calls[] = 'acquire';
+
+                return new TargetControlLeaseResult(
+                    TargetControlProtocol::IDENTITY,
+                    $context->lifecycleId,
+                    str_repeat('a', 64),
+                    'active',
+                    [new ResourceReference('fixture', 'fixture-a')],
+                    new ResourceReference('acceptance-lease-context', 'opaque-context-a'),
+                );
+            }
+
+            public function inspect(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle): TargetControlLeaseResult
+            {
+                throw new \LogicException('not called');
+            }
+
+            public function cleanup(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle, int $timeoutMs): TargetControlLeaseResult
+            {
+                $this->calls[] = 'cleanup';
+
+                return new TargetControlLeaseResult(
+                    TargetControlProtocol::IDENTITY,
+                    $context->lifecycleId,
+                    str_repeat('a', 64),
+                    'cleaned',
+                    [],
+                );
+            }
+        };
+        $adapter = $this->adapter(true, TargetEnvironment::TESTING, $control);
+        $context = $this->operationsHealthContext();
+        $prerequisites = $this->operationsHealthPrerequisites();
+
+        $account = $adapter->resolve($context, $prerequisites);
+        $accountContext = $context->withReferences($account->references);
+        $fixture = $adapter->provision($accountContext, $prerequisites);
+        $finalContext = $accountContext->withReferences($fixture->references);
+        $oracle = $adapter->evaluate($finalContext, TargetExecutionOutcome::succeeded());
+        $cleanup = $adapter->cleanup($finalContext, 30_000);
+
+        $this->assertTrue($account->succeeded);
+        $this->assertSame(['account'], array_column($account->references, 'type'));
+        $this->assertTrue($fixture->succeeded);
+        $this->assertSame(['fixture', 'acceptance-lease-context'], array_column($fixture->references, 'type'));
+        $this->assertTrue($oracle->passed);
+        $this->assertTrue($cleanup->succeeded);
+        $this->assertSame($finalContext->references, $cleanup->cleanedReferences);
+        $this->assertSame(['acquire', 'cleanup'], $control->calls);
+    }
+
+    private function adapter(
+        bool $enabled,
+        TargetEnvironment $environment,
+        ?DKSyntheticTargetControl $control = null,
+    ): DKTargetResourceAdapter {
+        $control ??= new class implements DKSyntheticTargetControl
+        {
+            public function acquire(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle): TargetControlLeaseResult
+            {
+                throw new \LogicException('not called');
+            }
+
+            public function inspect(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle): TargetControlLeaseResult
+            {
+                throw new \LogicException('not called');
+            }
+
+            public function cleanup(TargetContext $context, OperationsHealthVariant $variant, string $secretHandle, int $timeoutMs): TargetControlLeaseResult
+            {
+                throw new \LogicException('not called');
+            }
+        };
+        $variants = new OperationsHealthVariantCatalog;
+
+        return new DKTargetResourceAdapter(
+            new DKTargetProfile($enabled, $environment),
+            new OperationsHealthFixture($control, $variants, LocalLoopbackSecretHandleResolver::HANDLE),
+            $variants,
+        );
     }
 
     private function context(): TargetContext
@@ -110,6 +203,27 @@ class DKTargetResourceAdapterTest extends TestCase
     {
         return new PrerequisiteExecutionData(
             null, 'dk', 'foundation', 'foundation', 'foundation', 'default', 1,
+        );
+    }
+
+    private function operationsHealthContext(): TargetContext
+    {
+        return new TargetContext(
+            'dcb1cf9d-207c-4a44-963b-000000000001',
+            'dcb1cf9d-207c-4a44-963b-000000000002',
+            null,
+            'dk', 'notification-delivery', 'admin.delivery',
+            'nd-component-operations-health', 'v.b2ee9a53fab09e29', 1,
+        );
+    }
+
+    private function operationsHealthPrerequisites(): PrerequisiteExecutionData
+    {
+        return new PrerequisiteExecutionData(
+            null,
+            'dk', 'notification-delivery', 'admin.delivery',
+            'nd-component-operations-health', 'v.b2ee9a53fab09e29', 1,
+            secretReferences: ['credential' => LocalLoopbackSecretHandleResolver::HANDLE],
         );
     }
 }

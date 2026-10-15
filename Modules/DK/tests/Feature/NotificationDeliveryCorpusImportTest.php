@@ -93,7 +93,7 @@ final class NotificationDeliveryCorpusImportTest extends TestCase
         $this->assertSame(24668, array_sum(array_column(self::CHUNKS, 0)));
     }
 
-    public function test_generated_file_set_matches_every_imported_scenario_and_remains_non_executable(): void
+    public function test_generated_file_set_preserves_one_bounded_executable_scenario_and_all_other_skeletons(): void
     {
         $component = $this->files->get(base_path(
             'Modules/DK/app/Acceptance/Components/NotificationDelivery/NotificationDeliveryAcceptanceComponent.php',
@@ -112,6 +112,14 @@ final class NotificationDeliveryCorpusImportTest extends TestCase
         $this->assertSame($expected, $actual);
         foreach ($actual as $file) {
             $source = $this->files->get($directory.'/'.$file);
+            if ($file === 'NdComponentOperationsHealth.php') {
+                $this->assertStringContainsString('AutomationDisposition::AUTOMATED', $source);
+                $this->assertStringContainsString('EvidenceMode::NON_SENSITIVE_VISUAL', $source);
+                $this->assertStringContainsString("yield \$this->step('observe safe results'", $source);
+
+                continue;
+            }
+
             $this->assertStringContainsString('AutomationDisposition::NOT_IMPLEMENTED', $source);
             $this->assertStringContainsString('public function steps(TestContext $context): iterable', $source);
             $this->assertStringContainsString('return [];', $source);
@@ -131,6 +139,14 @@ final class NotificationDeliveryCorpusImportTest extends TestCase
         $creator = new NwidartTargetModuleCreator($modules, $this->files, $config, $validator);
         $creator->create(new TargetModuleDefinition('ExampleTarget', 'example-app'), false);
         $creator->createComponent('ExampleTarget', 'notification-delivery', false);
+        $componentPath = $this->root.'/ExampleTarget/app/Acceptance/Components/NotificationDelivery/NotificationDeliveryAcceptanceComponent.php';
+        $customHook = '        // custom prerequisite hook preserved outside managed regions';
+        $component = $this->files->get($componentPath);
+        $this->files->put($componentPath, str_replace(
+            '        // <tms:variants>',
+            $customHook.PHP_EOL.'        // <tms:variants>',
+            $component,
+        ));
         $chunks = [
             [new SourceCaseMapping(
                 'synthetic.case.001',
@@ -174,6 +190,7 @@ final class NotificationDeliveryCorpusImportTest extends TestCase
             }
         }
 
+        $this->assertSame(1, substr_count($this->files->get($componentPath), $customHook));
         $this->assertTrue($validator->validate('ExampleTarget')->valid);
         Notification::assertNothingSent();
         Queue::assertNothingPushed();

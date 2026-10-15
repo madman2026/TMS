@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\DK\Acceptance\Components\NotificationDelivery;
 
+use App\Acceptance\Prerequisites\Data\InputRequirement;
+use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Prerequisites\Enums\InputResolution;
+use App\Acceptance\Prerequisites\Enums\InputSensitivity;
+use App\Acceptance\Prerequisites\Enums\InputType;
 use App\Data\ScenarioDescriptor;
 use App\Data\SuiteDescriptor;
 use App\Data\VariantDescriptor;
@@ -11,6 +16,7 @@ use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Data\ScenarioMetadata;
 use Modules\Core\Enums\AutomationDisposition;
 use Modules\Core\Enums\EvidenceMode;
+use Modules\DK\Acceptance\Components\NotificationDelivery\Catalogs\OperationsHealthVariantCatalog;
 
 final class NotificationDeliveryAcceptanceComponent
 {
@@ -181,6 +187,16 @@ final class NotificationDeliveryAcceptanceComponent
 
     public function variants(string $scenarioKey): iterable
     {
+        if ($scenarioKey === 'nd-component-operations-health') {
+            $schema = $this->operationsHealthPrerequisiteSchema();
+
+            foreach ((new OperationsHealthVariantCatalog)->all() as $variant) {
+                yield new VariantDescriptor($variant->key, $schema);
+            }
+
+            return [];
+        }
+
         // <tms:variants>
         if ($scenarioKey === 'nd-component-attempts-show') { yield new VariantDescriptor('v.0ac4e2627f2daf8f'); }
         if ($scenarioKey === 'nd-component-attempts-show') { yield new VariantDescriptor('v.0f13aec78ea7c43c'); }
@@ -49536,7 +49552,28 @@ final class NotificationDeliveryAcceptanceComponent
 
     private function metadataFor(string $scenarioKey): ScenarioMetadata
     {
+        if ($scenarioKey === 'nd-component-operations-health') {
+            return new ScenarioMetadata(
+                ['browser'],
+                ['provider-io-none'],
+                AutomationDisposition::AUTOMATED,
+                EvidenceMode::NON_SENSITIVE_VISUAL,
+            );
+        }
+
         // Imported skeletons remain non-executable until an owner-local Pack adds behavior.
         return new ScenarioMetadata([], [], AutomationDisposition::NOT_IMPLEMENTED, EvidenceMode::METADATA_ONLY);
+    }
+
+    private function operationsHealthPrerequisiteSchema(): PrerequisiteSchema
+    {
+        return new PrerequisiteSchema('operations-health-v2', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
     }
 }

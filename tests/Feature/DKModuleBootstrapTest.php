@@ -31,7 +31,7 @@ class DKModuleBootstrapTest extends TestCase
         $validation = $this->app->make(TargetModuleValidator::class)->validate('DK');
 
         $this->assertSame(['dk'], $catalog->appKeys());
-        $this->assertSame('v3', $catalog->version('dk'));
+        $this->assertSame('v4', $catalog->version('dk'));
         $this->assertSame(
             ['notification-delivery'],
             array_map(
