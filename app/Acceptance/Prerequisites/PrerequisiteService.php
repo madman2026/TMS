@@ -9,7 +9,9 @@ use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Prerequisites\Data\PrerequisiteReferenceContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Prerequisites\Enums\InputResolution;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputSource;
 use App\Acceptance\Prerequisites\Enums\InputType;
@@ -24,6 +26,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
 use Throwable;
@@ -34,6 +37,7 @@ final class PrerequisiteService
     public function __construct(
         private readonly AcceptanceCatalog $catalog,
         private readonly OperatorContextProvider $operatorContext,
+        private readonly PrerequisiteReferenceResolverRegistry $referenceResolvers,
     ) {}
 
     /** @param array{app_key: string, component_key: string, suite_key: string, scenario_key: string, variant_key: string} $identity */
@@ -51,31 +55,17 @@ final class PrerequisiteService
                     throw PrerequisiteException::because('input_invalid');
                 }
                 $now = now();
-                $state = $schema->inputs === []
-                    ? ($this->requiredApprovals($schema) === [] ? PrerequisiteState::READY : PrerequisiteState::AWAITING_APPROVAL)
-                    : ($this->requiredInputs($schema) === []
-                        ? ($this->requiredApprovals($schema) === [] ? PrerequisiteState::READY : PrerequisiteState::AWAITING_APPROVAL)
-                        : PrerequisiteState::AWAITING_INPUT);
-                $request = AcceptanceOperationRequest::query()->create([
-                    'id' => $requestId,
-                    'correlation_id' => $correlationId,
-                    ...$identity,
-                    'profile_id' => $profileId,
-                    'schema_version' => $schema->version,
-                    'schema_fingerprint' => $schema->fingerprint(),
-                    'state' => $state,
-                    'lock_version' => 0,
-                    'expires_at' => $now->copy()->addSeconds($schema->requestTtlSeconds),
-                    'cancelled_at' => null,
-                ]);
-                $this->logTransition(
-                    $request,
-                    PrerequisiteState::DRAFT,
-                    $state,
-                    $operation,
+                $request = $this->createRequest(
+                    $identity,
+                    $profileId,
                     $correlationId,
+                    $requestId,
+                    $operation,
+                    $schema,
+                    $now,
                     $this->operatorContext->current(),
                 );
+                $this->resolveAutomaticInputs($request, $schema, $correlationId, $operation, $now);
 
                 return $this->snapshot($request, $schema, $correlationId, $now);
             });
@@ -329,11 +319,44 @@ final class PrerequisiteService
         return $this->run(function () use ($identity, $profileId, $requestId, $correlationId, $operation): PrerequisiteExecutionData {
             $schema = $this->schemaFor($identity);
             if ($requestId === null) {
-                if ($this->requiredInputs($schema) !== []) {
+                $manualInputs = array_filter(
+                    $schema->inputs,
+                    fn (InputRequirement $input): bool => $input->required
+                        && $input->resolution === InputResolution::OPERATOR,
+                );
+                if ($manualInputs !== []) {
                     throw PrerequisiteException::because('input_required');
                 }
                 if ($this->requiredApprovals($schema) !== []) {
                     throw PrerequisiteException::because('approval_required');
+                }
+                if ($this->requiredInputs($schema) !== []) {
+                    return DB::transaction(function () use (
+                        $identity,
+                        $profileId,
+                        $correlationId,
+                        $operation,
+                        $schema,
+                    ): PrerequisiteExecutionData {
+                        $now = now();
+                        $actor = new OperatorContext('app_resolver', $identity['app_key'].'-resolver');
+                        $request = $this->createRequest(
+                            $identity,
+                            $profileId,
+                            $correlationId,
+                            (string) Str::uuid(),
+                            $operation,
+                            $schema,
+                            $now,
+                            $actor,
+                        );
+                        $this->resolveAutomaticInputs($request, $schema, $correlationId, $operation, $now);
+                        if ($request->state !== PrerequisiteState::READY) {
+                            throw PrerequisiteException::because('prerequisite_reference_unavailable');
+                        }
+
+                        return $this->executionDataFrom($request);
+                    });
                 }
 
                 return new PrerequisiteExecutionData(
@@ -384,29 +407,149 @@ final class PrerequisiteService
                     throw PrerequisiteException::because('approval_required');
                 }
 
-                $values = [];
-                $references = [];
-                foreach ($request->inputs()->orderBy('key')->get() as $input) {
-                    if ($input->sensitivity === InputSensitivity::SECRET_REFERENCE) {
-                        $references[$input->key] = $input->secret_reference;
-                    } else {
-                        $values[$input->key] = $input->value_json;
-                    }
-                }
-
-                return new PrerequisiteExecutionData(
-                    (string) $request->getKey(),
-                    $request->app_key,
-                    $request->component_key,
-                    $request->suite_key,
-                    $request->scenario_key,
-                    $request->variant_key,
-                    $request->profile_id,
-                    $values,
-                    $references,
-                );
+                return $this->executionDataFrom($request);
             });
         });
+    }
+
+    /** @param array{app_key: string, component_key: string, suite_key: string, scenario_key: string, variant_key: string} $identity */
+    private function createRequest(
+        array $identity,
+        int $profileId,
+        string $correlationId,
+        string $requestId,
+        string $operation,
+        PrerequisiteSchema $schema,
+        Carbon $now,
+        OperatorContext $actor,
+    ): AcceptanceOperationRequest {
+        $state = $schema->inputs === []
+            ? ($this->requiredApprovals($schema) === [] ? PrerequisiteState::READY : PrerequisiteState::AWAITING_APPROVAL)
+            : ($this->requiredInputs($schema) === []
+                ? ($this->requiredApprovals($schema) === [] ? PrerequisiteState::READY : PrerequisiteState::AWAITING_APPROVAL)
+                : PrerequisiteState::AWAITING_INPUT);
+        $request = AcceptanceOperationRequest::query()->create([
+            'id' => $requestId,
+            'correlation_id' => $correlationId,
+            ...$identity,
+            'profile_id' => $profileId,
+            'schema_version' => $schema->version,
+            'schema_fingerprint' => $schema->fingerprint(),
+            'state' => $state,
+            'lock_version' => 0,
+            'expires_at' => $now->copy()->addSeconds($schema->requestTtlSeconds),
+            'cancelled_at' => null,
+        ]);
+        $this->logTransition(
+            $request,
+            PrerequisiteState::DRAFT,
+            $state,
+            $operation,
+            $correlationId,
+            $actor,
+        );
+
+        return $request;
+    }
+
+    private function resolveAutomaticInputs(
+        AcceptanceOperationRequest $request,
+        PrerequisiteSchema $schema,
+        string $correlationId,
+        string $operation,
+        Carbon $now,
+    ): void {
+        $requirements = array_values(array_filter(
+            $schema->inputs,
+            fn (InputRequirement $input): bool => $input->resolution === InputResolution::APP_REFERENCE,
+        ));
+        if ($requirements === []) {
+            return;
+        }
+
+        $resolver = $this->referenceResolvers->for($request->app_key);
+        if ($resolver === null) {
+            throw PrerequisiteException::because('prerequisite_reference_unavailable');
+        }
+
+        $actor = new OperatorContext('app_resolver', $request->app_key.'-resolver');
+        $changedKeys = [];
+        foreach ($requirements as $requirement) {
+            $context = new PrerequisiteReferenceContext(
+                $request->app_key,
+                $request->component_key,
+                $request->suite_key,
+                $request->scenario_key,
+                $request->variant_key,
+                $request->profile_id,
+                $schema->version,
+                $requirement->key,
+            );
+            try {
+                $reference = $resolver->resolve($context);
+                if ($reference === null) {
+                    throw PrerequisiteException::because('prerequisite_reference_unavailable');
+                }
+                $value = $this->normalize($requirement, [
+                    'source' => InputSource::SECRET_REFERENCE->value,
+                    'value' => $reference,
+                ], $request->app_key);
+            } catch (Throwable) {
+                throw PrerequisiteException::because('prerequisite_reference_unavailable');
+            }
+
+            AcceptanceOperationInput::query()->create([
+                'acceptance_operation_request_id' => $request->getKey(),
+                'key' => $requirement->key,
+                'schema_version' => $schema->version,
+                ...$value,
+                'submitted_by_type' => $actor->actorType,
+                'submitted_by_reference' => $actor->actorReference,
+                'submitted_at' => $now,
+            ]);
+            $changedKeys[] = $requirement->key;
+        }
+
+        $previous = $request->state;
+        $request->lock_version++;
+        $request->state = $this->computedState($request, $schema, $now);
+        $request->save();
+        if ($previous !== $request->state) {
+            $this->logTransition(
+                $request,
+                $previous,
+                $request->state,
+                $operation,
+                $correlationId,
+                $actor,
+                $changedKeys,
+            );
+        }
+    }
+
+    private function executionDataFrom(AcceptanceOperationRequest $request): PrerequisiteExecutionData
+    {
+        $values = [];
+        $references = [];
+        foreach ($request->inputs()->orderBy('key')->get() as $input) {
+            if ($input->sensitivity === InputSensitivity::SECRET_REFERENCE) {
+                $references[$input->key] = $input->secret_reference;
+            } else {
+                $values[$input->key] = $input->value_json;
+            }
+        }
+
+        return new PrerequisiteExecutionData(
+            (string) $request->getKey(),
+            $request->app_key,
+            $request->component_key,
+            $request->suite_key,
+            $request->scenario_key,
+            $request->variant_key,
+            $request->profile_id,
+            $values,
+            $references,
+        );
     }
 
     /** @template T @param callable(): T $callback @return T */

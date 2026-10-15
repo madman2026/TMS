@@ -2,15 +2,19 @@
 
 namespace Tests\Unit;
 
+use App\Acceptance\Prerequisites\Contracts\PrerequisiteReferenceResolver;
 use App\Acceptance\Prerequisites\Data\ApprovalRequirement;
 use App\Acceptance\Prerequisites\Data\InputRequirement;
+use App\Acceptance\Prerequisites\Data\PrerequisiteReferenceContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Prerequisites\Enums\InputResolution;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputSource;
 use App\Acceptance\Prerequisites\Enums\InputType;
 use App\Acceptance\Prerequisites\Enums\PrerequisiteState;
 use App\Acceptance\Prerequisites\LocalCliOperatorContextProvider;
 use App\Acceptance\Prerequisites\PrerequisiteException;
+use App\Acceptance\Prerequisites\PrerequisiteReferenceResolverRegistry;
 use App\Acceptance\Prerequisites\PrerequisiteService;
 use App\Contracts\AcceptanceComponentProvider;
 use App\Data\ComponentDescriptor;
@@ -50,6 +54,18 @@ class PrerequisiteServiceTest extends TestCase
             new InputRequirement('mode', InputType::STRING, allowedValues: ['alpha', 'beta']),
         ]);
         $this->assertSame($allowlistA->fingerprint(), $allowlistB->fingerprint());
+        $automatic = new PrerequisiteSchema('allowlist-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
+        $manual = new PrerequisiteSchema('allowlist-v1', [
+            new InputRequirement('credential', InputType::SECRET_REFERENCE, InputSensitivity::SECRET_REFERENCE),
+        ]);
+        $this->assertNotSame($manual->fingerprint(), $automatic->fingerprint());
 
         $this->expectException(InvalidArgumentException::class);
         new InputRequirement(
@@ -96,6 +112,18 @@ class PrerequisiteServiceTest extends TestCase
             ]),
             fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
                 new InputRequirement('name', InputType::STRING, listLimit: 1),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement('name', InputType::STRING, resolution: InputResolution::APP_REFERENCE),
+            ]),
+            fn (): PrerequisiteSchema => new PrerequisiteSchema('v1', [
+                new InputRequirement(
+                    'credential',
+                    InputType::SECRET_REFERENCE,
+                    InputSensitivity::SECRET_REFERENCE,
+                    required: false,
+                    resolution: InputResolution::APP_REFERENCE,
+                ),
             ]),
             fn (): PrerequisiteSchema => new PrerequisiteSchema('Invalid Version'),
         ];
@@ -434,9 +462,165 @@ class PrerequisiteServiceTest extends TestCase
         $this->assertSame([], $data->secretReferences);
     }
 
-    /** @return array{PrerequisiteService, AcceptanceComponentProvider} */
-    private function service(PrerequisiteSchema $schema): array
+    public function test_app_reference_is_prepared_and_materialized_automatically_with_safe_provenance(): void
     {
+        $schema = new PrerequisiteSchema('automatic-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
+        $resolver = new class implements PrerequisiteReferenceResolver
+        {
+            public function resolve(PrerequisiteReferenceContext $context): ?string
+            {
+                return $context->inputKey === 'credential' ? 'app-secret://app-a/automatic-a' : null;
+            }
+        };
+        [$service] = $this->service($schema, $resolver);
+        $profile = Profile::factory()->for(User::factory())->create();
+        $correlationId = (string) Str::uuid();
+
+        $prepared = $service->prepare(
+            $this->identity(),
+            (int) $profile->getKey(),
+            $correlationId,
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $execution = $service->executionData(
+            $this->identity(),
+            (int) $profile->getKey(),
+            null,
+            $correlationId,
+            'acceptance.run',
+        );
+
+        $this->assertSame(PrerequisiteState::READY, $prepared->state);
+        $this->assertSame([], $prepared->missingInputKeys);
+        $this->assertSame(['credential' => 'app-secret://app-a/automatic-a'], $execution->secretReferences);
+        $this->assertNotNull($execution->requestId);
+        $this->assertNotSame($prepared->requestId, $execution->requestId);
+        $this->assertDatabaseCount('acceptance_operation_requests', 2);
+        $this->assertDatabaseHas('acceptance_operation_inputs', [
+            'acceptance_operation_request_id' => $execution->requestId,
+            'key' => 'credential',
+            'secret_reference' => 'app-secret://app-a/automatic-a',
+            'submitted_by_type' => 'app_resolver',
+            'submitted_by_reference' => 'app-a-resolver',
+        ]);
+    }
+
+    public function test_automatic_resolution_fails_closed_without_a_valid_app_reference(): void
+    {
+        $schema = new PrerequisiteSchema('automatic-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
+        $profile = Profile::factory()->for(User::factory())->create();
+        [$missing] = $this->service($schema);
+
+        $this->assertPrerequisiteCode('prerequisite_reference_unavailable', fn () => $missing->executionData(
+            $this->identity(), (int) $profile->getKey(), null, (string) Str::uuid(), 'acceptance.run',
+        ));
+
+        $invalidResolver = new class implements PrerequisiteReferenceResolver
+        {
+            public function resolve(PrerequisiteReferenceContext $context): ?string
+            {
+                return 'example-sensitive-value';
+            }
+        };
+        [$invalid] = $this->service($schema, $invalidResolver);
+        $this->assertPrerequisiteCode('prerequisite_reference_unavailable', fn () => $invalid->executionData(
+            $this->identity(), (int) $profile->getKey(), null, (string) Str::uuid(), 'acceptance.run',
+        ));
+        $this->assertDatabaseCount('acceptance_operation_requests', 0);
+        $this->assertDatabaseCount('acceptance_operation_inputs', 0);
+    }
+
+    public function test_automatic_references_never_bypass_manual_inputs_or_approvals(): void
+    {
+        $resolver = new class implements PrerequisiteReferenceResolver
+        {
+            public function resolve(PrerequisiteReferenceContext $context): ?string
+            {
+                return 'app-secret://app-a/automatic-a';
+            }
+        };
+        $profile = Profile::factory()->for(User::factory())->create();
+        $approvalSchema = new PrerequisiteSchema('approval-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ], [new ApprovalRequirement('deploy')]);
+        [$approvalService] = $this->service($approvalSchema, $resolver);
+
+        $this->assertPrerequisiteCode('approval_required', fn () => $approvalService->executionData(
+            $this->identity(), (int) $profile->getKey(), null, (string) Str::uuid(), 'acceptance.run',
+        ));
+        $prepared = $approvalService->prepare(
+            $this->identity(),
+            (int) $profile->getKey(),
+            (string) Str::uuid(),
+            (string) Str::uuid(),
+            'test.prepare',
+        );
+        $this->assertSame(PrerequisiteState::AWAITING_APPROVAL, $prepared->state);
+        $this->assertSame(['deploy'], $prepared->missingApprovalScopes);
+
+        $mixedSchema = new PrerequisiteSchema('mixed-v1', [
+            new InputRequirement('username', InputType::STRING),
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
+        [$mixedService] = $this->service($mixedSchema, $resolver);
+        $this->assertPrerequisiteCode('input_required', fn () => $mixedService->executionData(
+            $this->identity(), (int) $profile->getKey(), null, (string) Str::uuid(), 'acceptance.run',
+        ));
+    }
+
+    public function test_reference_registry_rejects_duplicate_or_invalid_app_keys(): void
+    {
+        $resolver = new class implements PrerequisiteReferenceResolver
+        {
+            public function resolve(PrerequisiteReferenceContext $context): ?string
+            {
+                return null;
+            }
+        };
+        $registry = new PrerequisiteReferenceResolverRegistry;
+        $registry->register('app-a', $resolver);
+
+        $this->assertSame($resolver, $registry->for('app-a'));
+        try {
+            $registry->register('app-a', $resolver);
+            $this->fail('Expected duplicate resolver rejection.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('prerequisite_reference_resolver_duplicate', $exception->getMessage());
+        }
+        $this->expectException(InvalidArgumentException::class);
+        $registry->for('Invalid App');
+    }
+
+    /** @return array{PrerequisiteService, AcceptanceComponentProvider} */
+    private function service(
+        PrerequisiteSchema $schema,
+        ?PrerequisiteReferenceResolver $referenceResolver = null,
+    ): array {
         $provider = new class($schema) implements AcceptanceComponentProvider
         {
             public function __construct(public PrerequisiteSchema $schema) {}
@@ -494,9 +678,17 @@ class PrerequisiteServiceTest extends TestCase
         };
         $registry = new AcceptanceAppRegistry;
         $registry->register($provider);
+        $referenceResolvers = new PrerequisiteReferenceResolverRegistry;
+        if ($referenceResolver !== null) {
+            $referenceResolvers->register('app-a', $referenceResolver);
+        }
 
         return [
-            new PrerequisiteService(new AcceptanceCatalog($registry), new LocalCliOperatorContextProvider),
+            new PrerequisiteService(
+                new AcceptanceCatalog($registry),
+                new LocalCliOperatorContextProvider,
+                $referenceResolvers,
+            ),
             $provider,
         ];
     }

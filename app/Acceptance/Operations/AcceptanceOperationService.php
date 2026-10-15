@@ -16,6 +16,7 @@ use App\Acceptance\Operations\Data\OperationResult;
 use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Operations\Data\TargetModuleValidationData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Prerequisites\Enums\PrerequisiteState;
 use App\Acceptance\Prerequisites\PrerequisiteException;
 use App\Acceptance\Reporting\AcceptanceReportingException;
 use App\Acceptance\Reporting\Data\AcceptanceCoverageView;
@@ -24,6 +25,7 @@ use App\Acceptance\Reporting\Data\AcceptanceStatusView;
 use App\Acceptance\Targets\Data\TargetResourceLifecycleData;
 use App\Exceptions\AcceptanceCatalogException;
 use App\Exceptions\AcceptanceRegistryException;
+use App\Models\AcceptanceOperationRequest;
 use App\TestStatusEnum;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -54,7 +56,7 @@ final class AcceptanceOperationService
         'acceptance_registry_duplicate', 'acceptance_catalog_invalid',
         'acceptance_hierarchy_invalid', 'acceptance_hierarchy_duplicate',
         'target_module_path_invalid',
-        'prerequisite_schema_invalid', 'schema_changed',
+        'prerequisite_schema_invalid', 'schema_changed', 'prerequisite_reference_unavailable',
         'unsafe_target', 'resource_unavailable',
         'acceptance_coverage_mapping_invalid', 'acceptance_coverage_incomplete',
         'acceptance_evidence_reference_invalid', 'acceptance_reporting_failed',
@@ -157,7 +159,9 @@ final class AcceptanceOperationService
                 exceptionClass: $exception::class, identityContext: $identityContext);
         } catch (PrerequisiteException $exception) {
             $code = $exception->errorCode;
-            $status = $code === 'prerequisite_persistence_failed' || $code === 'prerequisite_schema_invalid'
+            $status = in_array($code, [
+                'prerequisite_persistence_failed', 'prerequisite_schema_invalid', 'prerequisite_reference_unavailable',
+            ], true)
                 ? 'failed' : 'rejected';
 
             return $this->finish($operation, $status, $code, $correlationId, $operationId,
@@ -367,13 +371,38 @@ final class AcceptanceOperationService
         return $operationId !== null
             && $data->lifecycleId === $operationId
             && $data->correlationId === $correlationId
-            && $data->prerequisiteRequestId === ($request->parameters['request_id'] ?? null)
+            && $this->matchesPrerequisiteRequest($data, $request, $correlationId)
             && $data->appKey === $request->parameters['app_key']
             && $data->componentKey === $request->parameters['component_key']
             && $data->suiteKey === $request->parameters['suite_key']
             && $data->scenarioKey === $request->parameters['scenario_key']
             && $data->variantKey === $request->parameters['variant_key']
             && $data->profileId === (int) $request->parameters['profile_id'];
+    }
+
+    private function matchesPrerequisiteRequest(
+        TargetResourceLifecycleData $data,
+        OperationRequest $request,
+        string $correlationId,
+    ): bool {
+        if (isset($request->parameters['request_id'])) {
+            return $data->prerequisiteRequestId === $request->parameters['request_id'];
+        }
+        if ($data->prerequisiteRequestId === null) {
+            return true;
+        }
+
+        return AcceptanceOperationRequest::query()
+            ->whereKey($data->prerequisiteRequestId)
+            ->where('correlation_id', $correlationId)
+            ->where('app_key', $request->parameters['app_key'])
+            ->where('component_key', $request->parameters['component_key'])
+            ->where('suite_key', $request->parameters['suite_key'])
+            ->where('scenario_key', $request->parameters['scenario_key'])
+            ->where('variant_key', $request->parameters['variant_key'])
+            ->where('profile_id', (int) $request->parameters['profile_id'])
+            ->where('state', PrerequisiteState::READY->value)
+            ->exists();
     }
 
     private function matchesPrerequisiteData(

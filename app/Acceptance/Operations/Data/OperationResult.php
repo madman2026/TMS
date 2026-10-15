@@ -29,6 +29,7 @@ final readonly class OperationResult
         'acceptance_source_mapping_invalid', 'acceptance_source_mapping_duplicate',
         'target_module_generation_failed', 'target_module_validation_failed',
         'prerequisite_request_not_found', 'prerequisite_schema_invalid', 'input_required',
+        'prerequisite_reference_unavailable',
         'prerequisite_request_mismatch',
         'approval_required', 'schema_changed', 'input_invalid', 'secret_literal_forbidden',
         'approval_stale', 'request_expired', 'invalid_transition', 'conflict',

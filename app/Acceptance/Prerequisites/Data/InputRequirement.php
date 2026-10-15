@@ -2,6 +2,7 @@
 
 namespace App\Acceptance\Prerequisites\Data;
 
+use App\Acceptance\Prerequisites\Enums\InputResolution;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputSource;
 use App\Acceptance\Prerequisites\Enums\InputType;
@@ -33,6 +34,7 @@ final readonly class InputRequirement
         public ?int $minimum = null,
         public ?int $maximum = null,
         ?int $listLimit = null,
+        public InputResolution $resolution = InputResolution::OPERATOR,
     ) {
         self::assertKey($key);
         $expectedSource = $sensitivity === InputSensitivity::SECRET_REFERENCE
@@ -43,6 +45,13 @@ final readonly class InputRequirement
             throw new InvalidArgumentException('prerequisite_schema_invalid');
         }
         $this->allowedSources = $sources;
+
+        if ($resolution === InputResolution::APP_REFERENCE
+            && (! $required || $type !== InputType::SECRET_REFERENCE
+                || $sensitivity !== InputSensitivity::SECRET_REFERENCE
+                || $sources !== [InputSource::SECRET_REFERENCE])) {
+            throw new InvalidArgumentException('prerequisite_schema_invalid');
+        }
 
         if ($allowedValues !== null) {
             if (! in_array($type, [InputType::STRING, InputType::INTEGER, InputType::BOOLEAN], true)
@@ -119,6 +128,7 @@ final readonly class InputRequirement
             'minimum' => $this->minimum,
             'maximum' => $this->maximum,
             'list_limit' => $this->listLimit,
+            'resolution' => $this->resolution->value,
         ];
     }
 

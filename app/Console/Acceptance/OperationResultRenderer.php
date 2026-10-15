@@ -517,6 +517,7 @@ final class OperationResultRenderer
             'acceptance_profile_not_found' => 'The selected profile does not exist.',
             'input_required', 'input_invalid', 'secret_literal_forbidden' => 'Correct the prerequisite inputs and secret references.',
             'approval_required', 'approval_stale' => 'Review or renew the prerequisite approval.',
+            'prerequisite_reference_unavailable' => 'An administrator must review the app prerequisite resolver.',
             'conflict', 'acceptance_batch_conflict', 'acceptance_attempt_stale' => 'Fetch the current state and lock version, then retry.',
             'target_not_ready' => 'Check target readiness, then run the operation again.',
             'unsafe_target', 'resource_unavailable' => 'Do not continue; an administrator must review the target configuration.',

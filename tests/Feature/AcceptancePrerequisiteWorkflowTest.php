@@ -7,15 +7,19 @@ use App\Acceptance\Operations\AcceptanceOperationService;
 use App\Acceptance\Operations\Data\OperationRequest;
 use App\Acceptance\Operations\Data\RunOperationData;
 use App\Acceptance\Prerequisites\Contracts\OperatorContextProvider;
+use App\Acceptance\Prerequisites\Contracts\PrerequisiteReferenceResolver;
 use App\Acceptance\Prerequisites\Data\ApprovalRequirement;
 use App\Acceptance\Prerequisites\Data\InputRequirement;
 use App\Acceptance\Prerequisites\Data\OperatorContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
 use App\Acceptance\Prerequisites\Data\PrerequisiteOperationData;
+use App\Acceptance\Prerequisites\Data\PrerequisiteReferenceContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Prerequisites\Enums\InputResolution;
 use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputType;
 use App\Acceptance\Prerequisites\Enums\PrerequisiteState;
+use App\Acceptance\Prerequisites\PrerequisiteReferenceResolverRegistry;
 use App\Acceptance\Targets\Contracts\TargetAccountResolver;
 use App\Acceptance\Targets\Contracts\TargetBrowserRuntimeResolver;
 use App\Acceptance\Targets\Contracts\TargetCleanup;
@@ -399,26 +403,21 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
 
     public function test_ready_execution_data_reaches_only_resource_adapters_and_never_operation_output_or_logs(): void
     {
-        $this->registerProvider($this->schema());
+        $this->registerProvider($this->automaticSchema());
+        $this->app->make(PrerequisiteReferenceResolverRegistry::class)->register(
+            'app-a',
+            new class implements PrerequisiteReferenceResolver
+            {
+                public function resolve(PrerequisiteReferenceContext $context): ?string
+                {
+                    return $context->inputKey === 'credential'
+                        ? 'app-secret://app-a/reference-a'
+                        : null;
+                }
+            },
+        );
         $profile = Profile::factory()->for(User::factory())->create();
         $service = $this->app->make(AcceptanceOperationService::class);
-        $prepared = $service->execute(new OperationRequest('acceptance.prerequisite.request.prepare', [
-            ...$this->identity(),
-            'profile_id' => $profile->getKey(),
-        ]));
-        $submitted = $service->execute(new OperationRequest('acceptance.prerequisite.input.submit', [
-            'request_id' => $prepared->data->requestId,
-            'expected_lock_version' => 0,
-            'inputs' => [
-                'username' => ['source' => 'literal', 'value' => 'operator-a'],
-                'credential' => ['source' => 'secret_reference', 'value' => 'app-secret://app-a/reference-a'],
-            ],
-        ]));
-        $service->execute(new OperationRequest('acceptance.prerequisite.approval.grant', [
-            'request_id' => $prepared->data->requestId,
-            'expected_lock_version' => $submitted->data->lockVersion,
-            'scope' => 'deploy',
-        ]));
 
         $adapter = new class implements TargetAccountResolver, TargetCleanup, TargetFixtureManager, TargetOracle, TargetReadinessProbe
         {
@@ -482,18 +481,21 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
         $result = $service->execute(new OperationRequest('acceptance.run', [
             ...$this->identity(),
             'profile_id' => $profile->getKey(),
-            'request_id' => $prepared->data->requestId,
         ]));
 
-        $this->assertSame('succeeded', $result->status);
+        $this->assertSame('succeeded', $result->status, (string) $result->errorCode);
         $this->assertInstanceOf(RunOperationData::class, $result->data);
-        $this->assertSame('operator-a', $adapter->received?->nonSensitiveInputs['username']);
+        $this->assertSame([], $adapter->received?->nonSensitiveInputs);
         $this->assertSame('app-secret://app-a/reference-a', $adapter->received?->secretReferences['credential']);
-        $this->assertStringNotContainsString('operator-a', print_r($result, true));
         $this->assertStringNotContainsString('app-secret://', print_r($result, true));
-        Log::shouldHaveReceived('info')->once()->withArgs(
+        $this->assertDatabaseCount('acceptance_operation_requests', 1);
+        $this->assertDatabaseHas('acceptance_operation_inputs', [
+            'key' => 'credential',
+            'secret_reference' => 'app-secret://app-a/reference-a',
+            'submitted_by_type' => 'app_resolver',
+        ]);
+        Log::shouldHaveReceived('info')->withArgs(
             fn (string $event, array $context): bool => $event === 'tms.acceptance.operation.completed'
-                && ! str_contains(print_r($context, true), 'operator-a')
                 && ! str_contains(print_r($context, true), 'app-secret://'),
         );
     }
@@ -600,6 +602,18 @@ class AcceptancePrerequisiteWorkflowTest extends TestCase
             new InputRequirement('credential', InputType::SECRET_REFERENCE, InputSensitivity::SECRET_REFERENCE, approvalRelevant: true),
         ], [
             new ApprovalRequirement('deploy', invalidatedByInputKeys: ['username', 'credential']),
+        ]);
+    }
+
+    private function automaticSchema(): PrerequisiteSchema
+    {
+        return new PrerequisiteSchema('automatic-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
         ]);
     }
 

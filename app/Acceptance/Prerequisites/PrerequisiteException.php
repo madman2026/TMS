@@ -10,6 +10,7 @@ final class PrerequisiteException extends RuntimeException
         'prerequisite_request_not_found',
         'prerequisite_request_mismatch',
         'prerequisite_schema_invalid',
+        'prerequisite_reference_unavailable',
         'input_required',
         'approval_required',
         'schema_changed',

@@ -26,6 +26,7 @@ use App\Acceptance\Operations\Handlers\SubmitOperationInput;
 use App\Acceptance\Operations\Handlers\ValidateAcceptanceApp;
 use App\Acceptance\Prerequisites\Contracts\OperatorContextProvider;
 use App\Acceptance\Prerequisites\LocalCliOperatorContextProvider;
+use App\Acceptance\Prerequisites\PrerequisiteReferenceResolverRegistry;
 use App\Acceptance\Targets\TargetBrowserRuntimeRegistry;
 use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Services\AcceptanceAppRegistry;
@@ -41,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AcceptanceAppRegistry::class);
         $this->app->bind(TargetModuleCreator::class, NwidartTargetModuleCreator::class);
         $this->app->bind(OperatorContextProvider::class, LocalCliOperatorContextProvider::class);
+        $this->app->singleton(PrerequisiteReferenceResolverRegistry::class);
         $this->app->singleton(TargetBrowserRuntimeRegistry::class);
         $this->app->singleton(TargetResourceRegistry::class);
         $this->app->singleton(AcceptanceOperationRegistry::class, function ($app) {
