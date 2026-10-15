@@ -14,9 +14,14 @@ use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Modules\Core\Contracts\AcceptanceScenario;
 use Modules\Core\Contracts\BrowserTargetRuntime;
+use Modules\Core\Contracts\ExecutorRegistry;
 use Modules\Core\Contracts\StepResult;
 use Modules\Core\Contracts\TestContext;
 use Modules\Core\Data\AcceptanceExecutionIdentity;
+use Modules\Core\Data\BrowserExecutorData;
+use Modules\Core\Data\BrowserStepData;
+use Modules\Core\Data\ExecutorRequest;
+use Modules\Core\Data\ExecutorResult;
 use Modules\Core\Data\RunOptions;
 use Modules\Core\Data\RunResult;
 use Modules\Core\Data\ScenarioMetadata;
@@ -136,6 +141,52 @@ class AcceptanceRunPersistenceTest extends TestCase
                 && $context['variant_key'] === 'variant-a'
                 && $context['error_code'] === 'acceptance_step_failed'
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'example-sensitive-value')),
+        );
+    }
+
+    public function test_it_persists_failed_browser_executor_steps_with_the_test_identity(): void
+    {
+        Log::spy();
+        $identity = $this->identity();
+        $executors = Mockery::mock(ExecutorRegistry::class);
+        $executors->shouldReceive('execute')->once()->withArgs(
+            fn (ExecutorRequest $request): bool => $request->identity === $identity,
+        )->andReturnUsing(static fn (ExecutorRequest $request): ExecutorResult => ExecutorResult::failed(
+            $request,
+            'browser',
+            'browser_execution_failed',
+            false,
+            true,
+            false,
+            new BrowserExecutorData(
+                'Scenario A',
+                false,
+                100,
+                [new BrowserStepData(1, 'failed browser step', false, 'acceptance_step_failed', 100, true)],
+            ),
+        ));
+        $runner = Mockery::mock(AcceptanceRunner::class);
+        $runner->shouldNotReceive('run');
+
+        $test = (new AcceptanceRunService($runner, $executors))->run(
+            $this->profile(),
+            $identity,
+            $this->scenario(),
+            $this->runtime(),
+        );
+
+        $this->assertSame(TestStatusEnum::FAILED, $test->status);
+        $this->assertSame('browser_execution_failed', $test->error_code);
+        $this->assertCount(1, $test->steps);
+        $this->assertSame('acceptance_step_failed', $test->steps[0]->error_code);
+        Log::shouldHaveReceived('warning')->once()->with(
+            'tms.acceptance.step.failed',
+            Mockery::on(fn (array $context): bool => $context['app_key'] === 'app-a'
+                && $context['component_key'] === 'component-a'
+                && $context['suite_key'] === 'suite-a'
+                && $context['scenario_key'] === 'scenario-a'
+                && $context['variant_key'] === 'variant-a'
+                && $context['error_code'] === 'acceptance_step_failed'),
         );
     }
 

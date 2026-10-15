@@ -138,7 +138,7 @@ class AcceptanceRunService
                 if (! $step->passed) {
                     Log::warning('tms.acceptance.step.failed', [
                         'test_id' => $test->getKey(),
-                        ...$this->identityContext($result->identity),
+                        ...$this->testIdentityContext($test),
                         'step_name' => $step->name,
                         'error_code' => $step->errorCode,
                         'critical' => $step->critical,
