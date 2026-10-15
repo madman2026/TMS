@@ -6,7 +6,7 @@ Make target scenario imports runtime-resolvable and scale-validatable before own
 
 ## 2. Status
 
-Partially implemented — Decisions 0018–0019 and Remediations 0003–0004 corrected and validated the retained DK descriptor imports and generic CLI test isolation; the complete suite now passes. The per-scenario metadata/replay-prevention slice is approved through Change Request 0009 and assigned to Pack 0019. Descriptor-resolution prevention, generated-source formatting policy, bounded PCRE execution, and remaining scale hardening stay proposed and separately gated here.
+Partially implemented — Decisions 0018–0019 and Remediations 0003–0004 corrected and validated the retained DK descriptor imports and generic CLI test isolation; the complete suite now passes. The per-scenario metadata/replay-prevention slice is accepted through Change Request 0009 and Pack 0019. Draft `REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006` is execution-normalized for descriptor-resolution prevention, canonical generated-format policy, bounded managed-region parsing and default-limit scale proof; source execution remains separately gated.
 
 ## 3. Related Release / Phase
 
@@ -78,7 +78,7 @@ Medium. The runtime correction is small, but the prevention belongs to a shared 
 
 ## 11. Migration or Remediation Needed
 
-Yes. Project Remediation 0003 owns the approved target-specific correction. A separate remediation remains required for the proposed shared prevention and scale/format hardening.
+Yes. Project Remediation 0003 owns the accepted target-specific correction. Draft Remediation 0006 now owns the proposed shared prevention and scale/format hardening and requires separate execution approval.
 
 ## 12. Required Human Approval
 
@@ -103,11 +103,11 @@ The operator chose to retain the safe partial import. Remediation 0003 rollback 
 
 ## 15. Final Decision
 
-Partially approved by the operator on 2026-10-11: exact DK descriptor imports and retained Pack output approved; shared prevention and scale/format hardening remain pending.
+Targeted DK correction was approved on 2026-10-11. Shared prevention and scale/format hardening are assigned to normalized draft Remediation 0006 and remain pending source execution and acceptance.
 
 ## 16. Required remediation
 
-`docs/project/ai/remediations/REMEDIATION-PACK-TMS-DK-DESCRIPTOR-IMPORTS-0003.md` owns the approved target-specific correction. A future project remediation is still required for the remaining shared items.
+`docs/project/ai/remediations/REMEDIATION-PACK-TMS-DK-DESCRIPTOR-IMPORTS-0003.md` owns the accepted target-specific correction. `docs/project/ai/remediations/REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006.md` owns the remaining shared items.
 
 ## 17. Notes
 
