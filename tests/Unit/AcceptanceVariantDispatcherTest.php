@@ -35,6 +35,16 @@ class AcceptanceVariantDispatcherTest extends TestCase
         $this->assertSame(0, $scenario->stepCalls);
     }
 
+    public function test_exact_resolution_does_not_traverse_unrelated_scenario_variants(): void
+    {
+        [$dispatcher, $provider, $scenario] = $this->dispatcher(AutomationDisposition::AUTOMATED);
+        $provider->includeUnrelatedScenario = true;
+        $provider->failUnrelatedVariantTraversal = true;
+
+        $this->assertSame($scenario, $dispatcher->resolve($this->identity()));
+        $this->assertSame(['scenario-a'], $provider->variantCalls);
+    }
+
     public function test_non_executable_variant_is_rejected_before_runtime_resolution(): void
     {
         [$dispatcher, $provider] = $this->dispatcher(AutomationDisposition::BLOCKED);
@@ -164,6 +174,12 @@ class AcceptanceVariantDispatcherTest extends TestCase
 
             public bool $failResolution = false;
 
+            public bool $includeUnrelatedScenario = false;
+
+            public bool $failUnrelatedVariantTraversal = false;
+
+            public array $variantCalls = [];
+
             public int $versionCalls = 0;
 
             public ?int $changeVersionAfter = null;
@@ -203,10 +219,17 @@ class AcceptanceVariantDispatcherTest extends TestCase
             public function scenarios(): iterable
             {
                 yield new ScenarioDescriptor('scenario-a', 'component-a', 'suite-a', $this->scenarioMetadata);
+                if ($this->includeUnrelatedScenario) {
+                    yield new ScenarioDescriptor('scenario-b', 'component-a', 'suite-a', $this->scenarioMetadata);
+                }
             }
 
             public function variants(string $scenarioKey): iterable
             {
+                $this->variantCalls[] = $scenarioKey;
+                if ($scenarioKey !== 'scenario-a' && $this->failUnrelatedVariantTraversal) {
+                    throw new \RuntimeException('Unrelated variants must not be traversed.');
+                }
                 yield new VariantDescriptor('variant-a');
             }
 

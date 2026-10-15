@@ -6,11 +6,78 @@ use App\Data\AcceptancePlan;
 use App\Data\AcceptancePlanItem;
 use App\Data\AcceptanceSelector;
 use App\Exceptions\AcceptanceCatalogException;
+use Modules\Core\Data\AcceptanceExecutionIdentity;
 
 /** Bounded streaming selection over one explicit hierarchy contract. */
 final class AcceptancePlanner
 {
     public function __construct(private readonly AcceptanceCatalog $catalog) {}
+
+    /** Build one exact executable identity without scanning unrelated scenario variants. */
+    public function planExact(AcceptanceExecutionIdentity $identity): AcceptancePlan
+    {
+        if (! in_array($identity->appKey, $this->catalog->appKeys(), true)) {
+            throw AcceptanceCatalogException::because('acceptance_app_not_found');
+        }
+
+        $selector = new AcceptanceSelector(
+            apps: [$identity->appKey],
+            components: [$identity->componentKey],
+            suites: [$identity->suiteKey],
+            scenarios: [$identity->scenarioKey],
+            variants: [$identity->variantKey],
+            limit: 1,
+        );
+        $version = $this->catalog->version($identity->appKey);
+        $visits = 0;
+        $componentFound = false;
+        foreach ($this->catalog->components($identity->appKey) as $component) {
+            AcceptanceCatalog::visit($visits);
+            $componentFound = $componentFound || $component->key === $identity->componentKey;
+        }
+
+        $suiteFound = false;
+        foreach ($this->catalog->suites($identity->appKey) as $suite) {
+            AcceptanceCatalog::visit($visits);
+            $suiteFound = $suiteFound || ($suite->key === $identity->suiteKey
+                && $suite->componentKey === $identity->componentKey);
+        }
+
+        $selectedDescriptor = null;
+        foreach ($this->catalog->descriptors($identity->appKey) as $descriptor) {
+            AcceptanceCatalog::visit($visits);
+            if ($descriptor->key === $identity->scenarioKey) {
+                $selectedDescriptor = $descriptor;
+            }
+        }
+        if (! $componentFound || ! $suiteFound || $selectedDescriptor === null
+            || $selectedDescriptor->componentKey !== $identity->componentKey
+            || $selectedDescriptor->suiteKey !== $identity->suiteKey) {
+            throw AcceptanceCatalogException::because('acceptance_selector_not_found');
+        }
+
+        $variantFound = false;
+        foreach ($this->catalog->variants($identity->appKey, $identity->scenarioKey) as $variant) {
+            AcceptanceCatalog::visit($visits);
+            $variantFound = $variantFound || $variant->key === $identity->variantKey;
+        }
+        if (! $variantFound) {
+            throw AcceptanceCatalogException::because('acceptance_selector_not_found');
+        }
+        if ($this->catalog->version($identity->appKey) !== $version
+            || $this->catalog->version($identity->appKey) !== $version) {
+            throw AcceptanceCatalogException::because('acceptance_catalog_changed');
+        }
+
+        return new AcceptancePlan($selector, [new AcceptancePlanItem(
+            $identity->appKey,
+            $identity->componentKey,
+            $identity->suiteKey,
+            $identity->scenarioKey,
+            $identity->variantKey,
+            $selectedDescriptor->metadata,
+        )], [$identity->appKey => $version]);
+    }
 
     public function plan(AcceptanceSelector $selector): AcceptancePlan
     {

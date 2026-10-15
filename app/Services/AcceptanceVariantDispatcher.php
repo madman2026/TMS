@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Data\AcceptanceSelector;
 use App\Data\ScenarioDescriptor;
 use App\Exceptions\AcceptanceCatalogException;
 use InvalidArgumentException;
@@ -21,14 +20,7 @@ final class AcceptanceVariantDispatcher
 
     public function resolve(AcceptanceExecutionIdentity $identity): AcceptanceScenario
     {
-        $plan = $this->planner->plan(new AcceptanceSelector(
-            apps: [$identity->appKey],
-            components: [$identity->componentKey],
-            suites: [$identity->suiteKey],
-            scenarios: [$identity->scenarioKey],
-            variants: [$identity->variantKey],
-            limit: 1,
-        ));
+        $plan = $this->planner->planExact($identity);
         $item = $plan->items[0] ?? null;
         if ($item === null || $item->identity() !== $identity->value()) {
             throw AcceptanceCatalogException::because('acceptance_selector_not_found');
