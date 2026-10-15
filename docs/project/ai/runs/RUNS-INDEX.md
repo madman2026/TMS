@@ -2,6 +2,12 @@
 
 | Run | Status | Acceptance | File |
 |---|---|---|---|
+| Prerequisite MySQL identifier portability run 001 | accepted | accepted — validation passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-PREREQUISITE-MYSQL-IDENTIFIERS-0008-run-001.md` |
+| Exact dispatch traversal run 001 | accepted | accepted — exact plan/live matrix passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-EXACT-DISPATCH-TRAVERSAL-0009-run-001.md` |
+| Browser result persistence run 001 | accepted | accepted — focused/full/live validation passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-BROWSER-RESULT-PERSISTENCE-0010-run-001.md` |
+| DK live Browser bridge corrections run 001 | accepted | accepted — 21/21 live variants and cleanup passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-BROWSER-BRIDGE-CORRECTIONS-0011-run-001.md` |
+| Automatic prerequisite references run 001 | accepted | accepted — 46/942 affected, 831/7311 full, and live Batch 21/21 passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-AUTOMATIC-PREREQUISITE-REFERENCES-0012-run-001.md` |
+| Acceptance Batch failure UX run 001 | accepted | accepted — full suite and exact 21/21 live Batch passed; scoped commit authorized 2026-10-15 | `docs/project/ai/runs/REMEDIATION-PACK-TMS-ACCEPTANCE-BATCH-FAILURE-UX-0013-run-001.md` |
 | Documentation governance bootstrap run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-DOCS-BOOTSTRAP-0001-run-001.md` |
 | Acceptance Runner stabilization run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-ACCEPTANCE-RUNNER-STABILIZATION-0002-run-001.md` |
 | Acceptance Command and App Registry run 001 | accepted | accepted | `docs/project/ai/runs/AI-PACK-TMS-ACCEPTANCE-COMMAND-REGISTRY-0003-run-001.md` |

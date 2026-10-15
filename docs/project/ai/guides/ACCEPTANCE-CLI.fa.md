@@ -8,7 +8,7 @@
 
 `--interactive` حالت انسانی CLI را فعال می‌کند و در صورت نیاز مقادیر را با Laravel Prompts می‌پرسد. تمام labelها، validation messageها، confirmationها، tableها و راهنمای خطای خود CLI فقط انگلیسی هستند؛ فارسی فقط زبان این راهنمای اپراتور است. این گزینه با `--json`، `--no-interaction` یا terminal غیرتعاملی سازگار نیست و با `cli_mode_invalid` و exit 2 رد می‌شود. Ctrl+C در prompt با `cli_interrupted` و exit 130 متوقف می‌شود و عملیات تغییردهنده را فراخوانی نمی‌کند.
 
-در این حالت هر ۱۸ فرمان عنوان آغاز، promptهای اعتبارسنجی‌شده، spinner اجرای operation و summary/table پایان را از Laravel Prompts می‌گیرند. فیلترهای catalog و coverage، تنظیمات runtime، pagination، mode اجرا و فایل‌های prerequisite فقط در صورت نیاز پرسیده می‌شوند. در Windows و تست‌ها fallback رسمی Laravel استفاده می‌شود و raw terminal behavior تحمیل نمی‌شود.
+در این حالت هر ۱۸ فرمان عنوان آغاز، promptهای اعتبارسنجی‌شده، spinner اجرای operation و summary/table پایان را از Laravel Prompts می‌گیرند. فیلترهای catalog و coverage، تنظیمات runtime، pagination و mode اجرا فقط در صورت نیاز پرسیده می‌شوند. فایل prerequisite هیچ‌وقت صرفاً به‌دلیل interactive بودن پرسیده نمی‌شود؛ مسیر دستی باید آن را صریحاً با `--prerequisites=<file>` بدهد. در Windows و تست‌ها fallback رسمی Laravel استفاده می‌شود و raw terminal behavior تحمیل نمی‌شود.
 
 ## هویت و selectorها
 
@@ -61,6 +61,38 @@ php artisan acceptance:coverage example-app --disposition=automated-full --json
 
 `acceptance:run` همچنين `--request-id`، `--browser`، `--headed`، `--timeout` و `--slow-mo` را می‌پذیرد. batch با mode برابر `async` برای ادامهٔ اجرا به queue worker از پیش پیکربندی‌شده نیاز دارد؛ CLI worker را راه‌اندازی یا تنظیم نمی‌کند.
 
+## مسیر سادهٔ prerequisite خودکار
+
+اگر schema ورودی موردنیاز را صریحاً از نوع `app_reference` اعلام کرده باشد، اجرای تست خودش یک prerequisite request مستقل می‌سازد، مرجع امن App را در آن ثبت می‌کند و request را به همان Run یا Batch Item متصل می‌کند. در این مسیر لازم نیست اپراتور Variantها را برای آماده‌سازی prerequisite استخراج کند، `acceptance:prerequisite:prepare` بزند، request IDها را کپی کند یا فایل `--prerequisites` بسازد.
+
+برای اجرای تمام Variantهای Operations Health، Catalog انتخاب را انجام می‌دهد و فرمان اصلی به این شکل است:
+
+```powershell
+$env:APP_LOCALE='en'
+$env:APP_FALLBACK_LOCALE='en'
+$env:DK_ACCEPTANCE_TARGET_PROFILE='local-testing'
+php artisan acceptance:batch:start 1 sync `
+  --app=dk `
+  --component=notification-delivery `
+  --suite=admin.delivery `
+  --scenario=nd-component-operations-health `
+  --json --no-interaction
+
+Remove-Item Env:DK_ACCEPTANCE_TARGET_PROFILE
+```
+
+`DK_ACCEPTANCE_TARGET_PROFILE` محرمانه نیست، اما فعال‌سازی target است. فقط مقدار دقیق `local-testing` پذیرفته می‌شود و به profile تستیِ loopback ثابت نگاشت می‌شود؛ مقدار غایب یا هر مقدار دیگری target را `disabled/unknown` نگه می‌دارد. این راهنما `.env` را تغییر نمی‌دهد و staging/production یا URL دلخواه را فعال نمی‌کند. اگر Laravel config cache ساخته شده باشد، تغییر shell الزاماً روی config cache موجود اثر ندارد؛ این workflow با config بدون cache اجرا می‌شود و ساخت/پاک‌کردن cache باید جداگانه و آگاهانه انجام شود.
+
+Target باید پیش از اجرای فرمان روی یک دیتابیس پذیرشِ disposable و اختصاصی بالا آمده باشد؛ baseline مربوط به providerها برای matrix کامل باید خالی باشد و user مصنوعی لازم برای ورود Browser از قبل وجود داشته باشد. انتخاب این دیتابیس نیز process-local است و نباید با تغییر ماندگار `.env` انجام شود.
+
+در هر target profile فقط یک Batch را هم‌زمان اجرا کنید و تا terminal شدن همان فرمان، Batch دیگری را شروع نکنید. اگر اجرای فعال با قطع terminal یا توقف process نیمه‌کاره ماند، ابتدا وضعیت Batch و lease هدف باید reconcile/cleanup شود؛ retry فوری ممکن است به `target_control_lease_conflict` منجر شود که در مرز فعلی fixture به‌صورت `fixture_setup_failed`/`cleanup_failed` دیده می‌شود.
+
+برای محدودکردن انتخاب می‌توان selectorهای تکرارپذیر `--variant` را اضافه کرد، اما هیچ request ID لازم نیست. `acceptance:run` نیز برای یک هویت دقیق، در صورت خودکاربودن schema، بدون `--request-id` اجرا می‌شود.
+
+فرمان‌های `acceptance:prerequisite:*` و گزینه‌های `--request-id`/`--prerequisites` حذف نشده‌اند. آن‌ها برای schemaهای دستی، approvalها، عیب‌یابی و اجرای صریح باقی می‌مانند. ورودی دستی و approval هرگز خودکار تکمیل یا تأیید نمی‌شود. اگر App یک مرجع خودکار معتبر ارائه نکند، اجرا با `prerequisite_reference_unavailable` و شناسهٔ correlation امن متوقف می‌شود.
+
+اگر تمام itemهای ناموفق یک `error_code` مشترک داشته باشند، نتیجهٔ اصلی Batch همان کد و classification را نشان می‌دهد؛ برای نمونه `unsafe_target` یعنی profile امن فعال نشده و اقدام اپراتور لازم است. فقط failureهای مختلط یا بدون کد زیر `acceptance_command_failed` جمع می‌شوند. برای جزئیات itemها از `acceptance:report <batch-id> --json --no-interaction` استفاده کنید.
+
 ## dry-run و تأیید
 
 create/import بدون `--apply` فقط برنامهٔ تغییر را برمی‌گرداند. در script، اعمال تغییر به هر دوی `--apply --confirm` نیاز دارد. approval، prerequisite cancellation، item retry و batch cancellation نیز `--confirm` می‌خواهند. در interactive، تأیید با prompt گرفته می‌شود. این تأیید UI جایگزین approval پایدار دامنه نیست.
@@ -70,7 +102,7 @@ create/import بدون `--apply` فقط برنامهٔ تغییر را برمی�
 ## فایل‌های JSON
 
 - `--mappings`: لیست `SourceCaseMapping`، حداکثر ۱ MiB.
-- `--prerequisites`: لیست ارجاع‌های tuple/request برای batch، حداکثر ۱ MiB.
+- `--prerequisites`: لیست ارجاع‌های tuple/request برای batchهای دستی یا صریح، حداکثر ۱ MiB؛ برای schemaهای کاملاً خودکار لازم نیست.
 - `--inputs`: map کلیدهای prerequisite، حداکثر ۶۴ KiB. هر مقدار دقیقاً `source` و `value` دارد.
 
 فایل باید UTF-8، قابل خواندن و یک JSON معتبر باشد. مسیر و محتوای فایل در output یا log تکرار نمی‌شود. مقدار محرمانه نباید در argv قرار گیرد؛ برای آن `source: secret_reference` و یک مرجع محرمانه ارسال کنید.
