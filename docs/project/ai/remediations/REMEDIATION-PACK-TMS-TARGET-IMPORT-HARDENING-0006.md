@@ -1,6 +1,6 @@
 # REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006 — Target import preflight, scale and generated-format hardening
 
-Status: `draft — execution-normalized 2026-10-12; source execution awaits a separate pre-execution approval`
+Status: `accepted — scoped, scale, DK, and full-suite validation passed; operator accepted and authorized commit 2026-10-15`
 
 ## 1. Task ID
 
@@ -46,6 +46,7 @@ DK Pack 0003 proved that dry-run/apply/replay and structural validation could su
 
 - `app/Acceptance/Modules/NwidartTargetModuleCreator.php`
 - `app/Acceptance/Modules/TargetModuleValidator.php`
+- `app/Acceptance/Operations/Data/ValidationIssue.php`
 - `tests/Unit/TargetModuleCreatorTest.php`
 - `tests/Unit/TargetModuleValidatorTest.php`
 - `docs/project/ai/changes/CHANGE-REQUEST-TMS-TARGET-IMPORT-COMPATIBILITY-0007.md`
@@ -178,10 +179,11 @@ After separate pre-execution approval:
 ```powershell
 php -l app/Acceptance/Modules/NwidartTargetModuleCreator.php
 php -l app/Acceptance/Modules/TargetModuleValidator.php
+php -l app/Acceptance/Operations/Data/ValidationIssue.php
 php -l tests/Unit/TargetModuleCreatorTest.php
 php -l tests/Unit/TargetModuleValidatorTest.php
 php -l tests/Unit/TargetModuleImportScaleTest.php
-php vendor/bin/pint --test app/Acceptance/Modules/NwidartTargetModuleCreator.php app/Acceptance/Modules/TargetModuleValidator.php tests/Unit/TargetModuleCreatorTest.php tests/Unit/TargetModuleValidatorTest.php tests/Unit/TargetModuleImportScaleTest.php
+php vendor/bin/pint --test app/Acceptance/Modules/NwidartTargetModuleCreator.php app/Acceptance/Modules/TargetModuleValidator.php app/Acceptance/Operations/Data/ValidationIssue.php tests/Unit/TargetModuleCreatorTest.php tests/Unit/TargetModuleValidatorTest.php tests/Unit/TargetModuleImportScaleTest.php
 php vendor/bin/phpunit --do-not-cache-result tests/Unit/TargetModuleCreatorTest.php tests/Unit/TargetModuleValidatorTest.php tests/Unit/TargetModuleImportScaleTest.php tests/Unit/AcceptanceHierarchyTest.php
 php artisan acceptance:app:validate DK --json
 php artisan acceptance:coverage dk --json
@@ -193,25 +195,27 @@ Command classification: syntax/Pint-check/Git inspection are non-mutating valida
 
 ## 21. Acceptance Checklist
 
-- [ ] exact allowlist preserved;
-- [ ] descriptor imports fail before write when invalid;
-- [ ] no target class/provider execution occurs in validation;
-- [ ] managed-region parsing is bounded and marker-safe;
-- [ ] 139/24,668 scale passes without PCRE override;
-- [ ] dry-run/apply/replay candidate hashes and counts pass;
-- [ ] generated-format policy assertions pass;
-- [ ] current DK source remains unchanged and validates 139/24,668;
-- [ ] focused and full suites pass;
-- [ ] Run/index/change lifecycle synchronized;
-- [ ] no commit without separate authorization.
+- [x] exact allowlist preserved;
+- [x] descriptor imports fail before write when invalid;
+- [x] no target class/provider execution occurs in validation;
+- [x] managed-region parsing is bounded and marker-safe;
+- [x] 139/24,668 scale passes without PCRE override;
+- [x] dry-run/apply/replay candidate hashes and counts pass;
+- [x] generated-format policy assertions pass;
+- [x] current DK source remains unchanged and validates 139/24,668;
+- [x] focused and full suites pass;
+- [x] Run/index/change lifecycle synchronized;
+- [x] no commit without separate authorization.
+
+Execution evidence: the final focused set passed 30 tests and 74,303 assertions in 77.313 seconds using 166 MB; the synthetic scale slice passed 139 scenarios and 24,668 mappings under unchanged default PCRE settings; DK validation and exact coverage passed with an unchanged tracked-index hash. After the operator resolved the external full-suite blocker, the final repository-wide run passed 846 tests and 81,530 assertions in 115.92 seconds. Three verified stale synthetic test roots were removed and the post-suite residue count is zero. See Run 001 for the exact evidence.
 
 ## 22. Rollback / Safety Notes
 
-Revert only the two shared source files, three test files and lifecycle records from this Pack. Temporary test roots must be verified beneath the test-owned prefix before deletion. Do not restore/remove current DK generated files, modules, mappings or user changes. No data rollback exists.
+Revert only the three shared source files, three test files and lifecycle records from this Pack. Temporary test roots must be verified beneath the test-owned prefix before deletion. Do not restore/remove current DK generated files, modules, mappings or user changes. No data rollback exists.
 
 ## 23. Operator Review Checklist
 
-Before execution: approve the exact five source/test paths, validator issue code, linear marker scanner, managed-region Pint exemption/canonical-generator policy, scale test and full-suite command. After execution: inspect focused failures/successes, scale time/memory, DK untouched proof, full suite, diff and lifecycle status.
+Execution approval was received for the exact six source/test paths, validator issue code, linear marker scanner, managed-region Pint exemption/canonical-generator policy, scale test and full-suite command. The operator reviewed and accepted the final scoped, scale, DK, full-suite, cleanup, diff, and lifecycle result on 2026-10-15 and separately authorized commit.
 
 ## 24. Operator Documentation Impact
 

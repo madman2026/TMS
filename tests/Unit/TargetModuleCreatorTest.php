@@ -13,6 +13,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Mockery;
 use Nwidart\Modules\Contracts\RepositoryInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class TargetModuleCreatorTest extends TestCase
@@ -84,6 +85,7 @@ class TargetModuleCreatorTest extends TestCase
         $mappings = $this->mappings();
 
         $import = $creator->importScenarios('ExampleTarget', $mappings, false);
+        $appliedHashes = $this->treeHashes('ExampleTarget');
         $again = $creator->importScenarios('ExampleTarget', $mappings, false);
 
         $this->assertSame('billing', $component->componentKey);
@@ -96,7 +98,77 @@ class TargetModuleCreatorTest extends TestCase
         $componentSource = $this->files->get($this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php');
         $this->assertStringContainsString("yield new SuiteDescriptor('invoices', 'billing')", $componentSource);
         $this->assertStringContainsString('AutomationDisposition::NOT_IMPLEMENTED', $componentSource);
+        $this->assertSame($appliedHashes, $this->treeHashes('ExampleTarget'));
         $this->assertTrue($this->validator()->validate('ExampleTarget')->valid);
+    }
+
+    #[DataProvider('importModes')]
+    public function test_invalid_descriptor_import_fails_preflight_without_writing(bool $dryRun): void
+    {
+        $creator = $this->creator();
+        $creator->create(new TargetModuleDefinition('ExampleTarget', 'example-app'), false);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $path = $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php';
+        $content = preg_replace(
+            '/^use App\\\\Data\\\\SuiteDescriptor;\R/m',
+            '',
+            $this->files->get($path),
+            1,
+        );
+        $this->assertIsString($content);
+        $this->files->put($path, $content);
+        $before = $this->treeHashes('ExampleTarget');
+
+        try {
+            $creator->importScenarios('ExampleTarget', [
+                new SourceCaseMapping('case-1', CoverageDisposition::AUTOMATED_FULL,
+                    'billing', 'invoices', 'invoice-creates', 'default'),
+            ], $dryRun);
+            $this->fail('Expected descriptor import preflight failure.');
+        } catch (TargetModuleException $exception) {
+            $this->assertSame('target_module_descriptor_import_invalid', $exception->errorCode);
+        }
+
+        $this->assertSame($before, $this->treeHashes('ExampleTarget'));
+        $this->assertFileDoesNotExist(
+            $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/Scenarios/InvoiceCreates.php',
+        );
+    }
+
+    #[DataProvider('invalidManagedRegions')]
+    public function test_invalid_managed_region_fails_safely_before_write(string $mutation): void
+    {
+        $creator = $this->creator();
+        $creator->create(new TargetModuleDefinition('ExampleTarget', 'example-app'), false);
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $path = $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php';
+        $content = $this->files->get($path);
+        $opening = '        // <tms:suites>';
+        $closing = '        // </tms:suites>';
+        $content = match ($mutation) {
+            'duplicate' => str_replace($opening, $opening.PHP_EOL.$opening, $content),
+            'reversed' => str_replace(
+                [$opening, $closing, '__TMS_SUITE_OPEN__'],
+                ['__TMS_SUITE_OPEN__', $opening, $closing],
+                $content,
+            ),
+            'nested' => str_replace($opening, $opening.PHP_EOL.'        // <tms:other>', $content),
+            'missing' => str_replace($closing, '', $content),
+        };
+        $this->files->put($path, $content);
+        $before = $this->treeHashes('ExampleTarget');
+
+        try {
+            $creator->importScenarios('ExampleTarget', [
+                new SourceCaseMapping('case-1', CoverageDisposition::AUTOMATED_FULL,
+                    'billing', 'invoices', 'invoice-creates', 'default'),
+            ], false);
+            $this->fail('Expected managed-region validation failure.');
+        } catch (TargetModuleException $exception) {
+            $this->assertSame('target_module_managed_region_invalid', $exception->errorCode);
+        }
+
+        $this->assertSame($before, $this->treeHashes('ExampleTarget'));
     }
 
     public function test_legacy_generated_metadata_contract_migrates_once_across_dry_run_apply_and_replay(): void
@@ -300,5 +372,35 @@ class TargetModuleCreatorTest extends TestCase
             coveredAssertions: ['creates'],
             uncoveredAssertions: ['duplicate'],
         );
+    }
+
+    public static function importModes(): array
+    {
+        return [
+            'dry run' => [true],
+            'apply' => [false],
+        ];
+    }
+
+    public static function invalidManagedRegions(): array
+    {
+        return [
+            'duplicate marker' => ['duplicate'],
+            'reversed markers' => ['reversed'],
+            'nested marker' => ['nested'],
+            'missing marker' => ['missing'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function treeHashes(string $moduleName): array
+    {
+        $hashes = [];
+        foreach ($this->files->allFiles($this->root.'/'.$moduleName, true) as $file) {
+            $hashes[str_replace('\\', '/', $file->getRelativePathname())] = hash_file('sha256', $file->getPathname());
+        }
+        ksort($hashes);
+
+        return $hashes;
     }
 }

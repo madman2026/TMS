@@ -115,13 +115,25 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         $updates = [];
         $changeActions = [];
         $hierarchy = $this->hierarchyIndex($modulePath, $components, $componentContents);
+        [$mappingLines, $sourceIds, $mappingIdentities] = $this->mappingIndex($mappingContent);
+        $componentAdditions = [];
 
         foreach ($mappings as $mapping) {
-            $mappingExists = str_contains($mappingContent, trim($this->sourceMappingLine($mapping)));
-            if (! $mappingExists) {
-                $this->assertExistingMappingIdentity($mappingContent, $mapping);
+            $mappingLine = trim($this->sourceMappingLine($mapping));
+            $mappingExists = isset($mappingLines[$mappingLine]);
+            $mappingIdentity = $mapping->executableIdentity();
+            $mappingIdentityKey = $mappingIdentity === null ? null : implode("\0", $mappingIdentity);
+            if (! $mappingExists && (isset($sourceIds[$mapping->sourceCaseId])
+                || ($mappingIdentityKey !== null && isset($mappingIdentities[$mappingIdentityKey])))) {
+                throw TargetModuleException::because('acceptance_source_mapping_duplicate');
             }
-            $mappingContent = $this->mergeSourceMapping($mappingContent, $mapping);
+            if (! $mappingExists) {
+                $mappingLines[$mappingLine] = true;
+                $sourceIds[$mapping->sourceCaseId] = true;
+                if ($mappingIdentityKey !== null) {
+                    $mappingIdentities[$mappingIdentityKey] = true;
+                }
+            }
             if (! $mapping->executable()) {
                 continue;
             }
@@ -149,22 +161,17 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             $content = $componentContents[$componentRelative] ?? $this->files->get($componentPath);
             $content = $this->migrateScenarioMetadataContract($content);
             $scenarioClass = Str::studly($mapping->scenarioKey);
-            $this->assertScenarioCollision($content, $mapping->scenarioKey, $scenarioClass, $mapping->suiteKey);
-            $content = $this->mergeManagedLines($content, 'suites', [
-                "        yield new SuiteDescriptor('{$mapping->suiteKey}', '{$componentKey}');",
-            ]);
-            $content = $this->mergeManagedLines($content, 'scenarios', [
-                "        yield new ScenarioDescriptor('{$mapping->scenarioKey}', '{$componentKey}', '{$mapping->suiteKey}', \$this->metadataFor('{$mapping->scenarioKey}'));",
-            ]);
-            $content = $this->mergeManagedLines($content, 'variants', [
-                "        if (\$scenarioKey === '{$mapping->scenarioKey}') { yield new VariantDescriptor('{$mapping->variantKey}'); }",
-            ]);
             $scenarioFqcn = $definition->namespace.'\\Acceptance\\Components\\'.$componentClass
                 .'\\Scenarios\\'.$scenarioClass;
-            $content = $this->mergeManagedLines($content, 'resolutions', [
-                "        if (\$suiteKey === '{$mapping->suiteKey}' && \$scenarioKey === '{$mapping->scenarioKey}' && \$variantKey === '{$mapping->variantKey}') { return new \\{$scenarioFqcn}; }",
-            ]);
             $componentContents[$componentRelative] = $content;
+            $componentAdditions[$componentRelative]['suites'][] =
+                "        yield new SuiteDescriptor('{$mapping->suiteKey}', '{$componentKey}');";
+            $componentAdditions[$componentRelative]['scenarios'][] =
+                "        yield new ScenarioDescriptor('{$mapping->scenarioKey}', '{$componentKey}', '{$mapping->suiteKey}', \$this->metadataFor('{$mapping->scenarioKey}'));";
+            $componentAdditions[$componentRelative]['variants'][] =
+                "        if (\$scenarioKey === '{$mapping->scenarioKey}') { yield new VariantDescriptor('{$mapping->variantKey}'); }";
+            $componentAdditions[$componentRelative]['resolutions'][] =
+                "        if (\$suiteKey === '{$mapping->suiteKey}' && \$scenarioKey === '{$mapping->scenarioKey}' && \$variantKey === '{$mapping->variantKey}') { return new \\{$scenarioFqcn}; }";
 
             $scenarioRelative = 'app/Acceptance/Components/'.$componentClass.'/Scenarios/'.$scenarioClass.'.php';
             $scenario = $this->renderTms('AcceptanceScenario.stub', [
@@ -175,6 +182,15 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
                 'SCENARIO_KEY' => $mapping->scenarioKey,
             ]);
             $newFiles[$scenarioRelative] = $scenario;
+        }
+
+        $mappingContent = $this->mergeManagedLines($mappingContent, 'source-case-mappings', array_keys($mappingLines));
+        foreach ($componentAdditions as $relative => $regions) {
+            $content = $componentContents[$relative];
+            foreach ($regions as $region => $lines) {
+                $content = $this->mergeManagedLines($content, $region, $lines);
+            }
+            $componentContents[$relative] = $content;
         }
 
         foreach ($componentContents as $relative => $content) {
@@ -191,6 +207,12 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         $changeActions[$mappingRelative] = $mappingContent === $originalMappings ? 'unchanged' : 'update_managed_region';
         foreach ($newFiles as $relative => $content) {
             $changeActions[$relative] = $this->newFileAction($this->join($modulePath, $relative), $content);
+        }
+        $candidateFiles = [...$newFiles, ...$updates];
+        $validation = $this->validator->validatePath($definition, $modulePath, $candidateFiles);
+        if (! $validation->valid || $validation->appKey !== $definition->appKey) {
+            $issue = $validation->issues[0] ?? null;
+            throw TargetModuleException::because($issue?->code ?? 'target_module_validation_failed');
         }
         if (! $dryRun) {
             $this->applyChanges($modulePath, $newFiles, $updates);
@@ -287,6 +309,12 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             throw TargetModuleException::because('target_module_validation_failed');
         }
         foreach ($validation->issues as $issue) {
+            if (in_array($issue->code, [
+                'target_module_descriptor_import_invalid',
+                'target_module_managed_region_invalid',
+            ], true)) {
+                throw TargetModuleException::because($issue->code);
+            }
             if (! in_array($issue->code, ['acceptance_hierarchy_invalid', 'acceptance_source_mapping_invalid'], true)) {
                 throw TargetModuleException::because('target_module_validation_failed');
             }
@@ -361,19 +389,6 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         }
     }
 
-    private function assertScenarioCollision(string $component, string $key, string $class, string $suite): void
-    {
-        preg_match_all("/ScenarioDescriptor\\('([^']+)', '[^']+', '([^']+)'/", $component, $matches, PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            if ($match[1] === $key && $match[2] !== $suite) {
-                throw TargetModuleException::because('target_module_path_collision');
-            }
-            if ($match[1] !== $key && Str::studly($match[1]) === $class) {
-                throw TargetModuleException::because('target_module_path_collision');
-            }
-        }
-    }
-
     /** @return array<string, string> */
     private function componentMap(string $app): array
     {
@@ -384,17 +399,6 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
         }
 
         return $result;
-    }
-
-    private function mergeSourceMapping(string $content, SourceCaseMapping $mapping): string
-    {
-        preg_match_all("/sourceCaseId: '([^']+)'/", $content, $matches);
-        $line = $this->sourceMappingLine($mapping);
-        if (in_array($mapping->sourceCaseId, $matches[1] ?? [], true) && ! str_contains($content, trim($line))) {
-            throw TargetModuleException::because('acceptance_source_mapping_duplicate');
-        }
-
-        return $this->mergeManagedLines($content, 'source-case-mappings', [$line]);
     }
 
     private function sourceMappingLine(SourceCaseMapping $mapping): string
@@ -415,16 +419,38 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             'uncoveredAssertions: '.$this->listLiteral($mapping->uncoveredAssertions).'),';
     }
 
-    private function assertExistingMappingIdentity(string $content, SourceCaseMapping $mapping): void
+    /**
+     * @return array{array<string, true>, array<string, true>, array<string, true>}
+     */
+    private function mappingIndex(string $content): array
     {
-        $identity = $mapping->executableIdentity();
-        if ($identity !== null) {
-            $fragment = 'componentKey: '.$this->literal($identity[0]).', suiteKey: '.$this->literal($identity[1])
-                .', scenarioKey: '.$this->literal($identity[2]).', variantKey: '.$this->literal($identity[3]);
-            if (str_contains($content, $fragment)) {
-                throw TargetModuleException::because('acceptance_source_mapping_duplicate');
+        $region = $this->managedRegion($content, 'source-case-mappings');
+        if ($region === null) {
+            throw TargetModuleException::because('target_module_managed_region_invalid');
+        }
+        $lines = [];
+        $sourceIds = [];
+        $identities = [];
+        foreach ($region['lines'] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $lines[$line] = true;
+            if (preg_match("/sourceCaseId: '([A-Za-z0-9][A-Za-z0-9._:-]{0,127})'/", $line, $source) !== 1) {
+                throw TargetModuleException::because('acceptance_source_mapping_invalid');
+            }
+            $sourceIds[$source[1]] = true;
+            if (preg_match(
+                "/componentKey: '([^']+)', suiteKey: '([^']+)', scenarioKey: '([^']+)', variantKey: '([^']+)'/",
+                $line,
+                $identity,
+            ) === 1) {
+                $identities[implode("\0", array_slice($identity, 1))] = true;
             }
         }
+
+        return [$lines, $sourceIds, $identities];
     }
 
     /**
@@ -443,17 +469,26 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             }
             $relative = 'app/Acceptance/Components/'.$componentClass.'/'.$componentClass.'AcceptanceComponent.php';
             $content = $componentContents[$relative] ?? $this->files->get($path);
-            preg_match_all("/SuiteDescriptor\\('([^']+)', '([^']+)'\\)/", $content, $suites, PREG_SET_ORDER);
-            foreach ($suites as $suite) {
-                $result['suites'][$suite[1]] = $suite[2];
+            $suites = $this->managedRegion($content, 'suites');
+            $scenarios = $this->managedRegion($content, 'scenarios');
+            $variants = $this->managedRegion($content, 'variants');
+            if ($suites === null || $scenarios === null || $variants === null) {
+                throw TargetModuleException::because('target_module_managed_region_invalid');
             }
-            preg_match_all("/ScenarioDescriptor\\('([^']+)', '([^']+)', '([^']+)'/", $content, $scenarios, PREG_SET_ORDER);
-            foreach ($scenarios as $scenario) {
-                $result['scenarios'][$scenario[1]] = $scenario[2]."\0".$scenario[3];
+            foreach ($suites['lines'] as $line) {
+                if (preg_match("/SuiteDescriptor\\('([^']+)', '([^']+)'\\)/", $line, $suite) === 1) {
+                    $result['suites'][$suite[1]] = $suite[2];
+                }
             }
-            preg_match_all("/\\\$scenarioKey === '([^']+)'\\) \\{ yield new VariantDescriptor\\('([^']+)'\\); \\}/", $content, $variants, PREG_SET_ORDER);
-            foreach ($variants as $variant) {
-                $result['variants'][$variant[1]."\0".$variant[2]] = $componentKey;
+            foreach ($scenarios['lines'] as $line) {
+                if (preg_match("/ScenarioDescriptor\\('([^']+)', '([^']+)', '([^']+)'/", $line, $scenario) === 1) {
+                    $result['scenarios'][$scenario[1]] = $scenario[2]."\0".$scenario[3];
+                }
+            }
+            foreach ($variants['lines'] as $line) {
+                if (preg_match("/\\\$scenarioKey === '([^']+)'\\) \\{ yield new VariantDescriptor\\('([^']+)'\\); \\}/", $line, $variant) === 1) {
+                    $result['variants'][$variant[1]."\0".$variant[2]] = $componentKey;
+                }
             }
         }
 
@@ -463,23 +498,94 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
     /** @param list<string> $newLines */
     private function mergeManagedLines(string $content, string $region, array $newLines): string
     {
-        $pattern = '/^([ \t]*)\/\/ <tms:'.preg_quote($region, '/').'>\R(.*?)^\1\/\/ <\/tms:'
-            .preg_quote($region, '/').'>/ms';
-        if (! preg_match($pattern, $content, $match)) {
-            throw TargetModuleException::because('target_module_path_collision');
+        $managed = $this->managedRegion($content, $region);
+        if ($managed === null) {
+            throw TargetModuleException::because('target_module_managed_region_invalid');
         }
-        $existing = preg_split('/\R/', trim($match[2])) ?: [];
-        $lines = array_map('trim', [...$existing, ...$newLines]);
+        $lines = array_map('trim', [...$managed['lines'], ...$newLines]);
         $lines = array_values(array_filter($lines, fn (string $line): bool => $line !== ''));
         $lines = array_values(array_unique($lines));
         sort($lines, SORT_STRING);
-        $replacement = $match[1].'// <tms:'.$region.'>'.PHP_EOL;
+        $replacement = $managed['indent'].'// <tms:'.$region.'>'.$managed['newline'];
         if ($lines !== []) {
-            $replacement .= $match[1].implode(PHP_EOL.$match[1], $lines).PHP_EOL;
+            $replacement .= $managed['indent'].implode(
+                $managed['newline'].$managed['indent'],
+                $lines,
+            ).$managed['newline'];
         }
-        $replacement .= $match[1].'// </tms:'.$region.'>';
+        $replacement .= $managed['indent'].'// </tms:'.$region.'>';
 
-        return preg_replace($pattern, $replacement, $content, 1) ?? throw TargetModuleException::because('target_module_path_collision');
+        return substr($content, 0, $managed['start'])
+            .$replacement
+            .substr($content, $managed['end']);
+    }
+
+    /**
+     * @return array{start: int, end: int, indent: string, newline: string, lines: list<string>}|null
+     */
+    private function managedRegion(string $content, string $region): ?array
+    {
+        $opening = '// <tms:'.$region.'>';
+        $closing = '// </tms:'.$region.'>';
+        $length = strlen($content);
+        $offset = 0;
+        $start = null;
+        $bodyStart = null;
+        $end = null;
+        $indent = '';
+        $newline = null;
+        $lines = [];
+
+        while ($offset <= $length) {
+            $lineFeed = strpos($content, "\n", $offset);
+            $next = $lineFeed === false ? $length : $lineFeed + 1;
+            $contentEnd = $lineFeed === false ? $length : $lineFeed;
+            if ($contentEnd > $offset && $content[$contentEnd - 1] === "\r") {
+                $contentEnd--;
+            }
+            $line = substr($content, $offset, $contentEnd - $offset);
+            $trimmed = ltrim($line, " \t");
+            $isMarker = (str_starts_with($trimmed, '// <tms:') || str_starts_with($trimmed, '// </tms:'))
+                && str_ends_with($trimmed, '>');
+
+            if ((str_contains($line, $opening) && $trimmed !== $opening)
+                || (str_contains($line, $closing) && $trimmed !== $closing)) {
+                return null;
+            }
+            if ($trimmed === $opening) {
+                if ($start !== null || $end !== null || $lineFeed === false) {
+                    return null;
+                }
+                $start = $offset;
+                $bodyStart = $next;
+                $indent = substr($line, 0, strlen($line) - strlen($trimmed));
+                $newline = substr($content, $contentEnd, $next - $contentEnd);
+            } elseif ($trimmed === $closing) {
+                if ($start === null || $end !== null) {
+                    return null;
+                }
+                if (substr($line, 0, strlen($line) - strlen($trimmed)) !== $indent) {
+                    return null;
+                }
+                $end = $contentEnd;
+            } elseif ($start !== null && $end === null) {
+                if ($isMarker) {
+                    return null;
+                }
+                $lines[] = $line;
+            }
+
+            if ($lineFeed === false) {
+                break;
+            }
+            $offset = $next;
+        }
+
+        if ($start === null || $bodyStart === null || $end === null || $newline === null) {
+            return null;
+        }
+
+        return compact('start', 'end', 'indent', 'newline', 'lines');
     }
 
     private function migrateScenarioMetadataContract(string $content): string
@@ -494,15 +600,28 @@ final class NwidartTargetModuleCreator implements TargetModuleCreator
             throw TargetModuleException::because('target_module_path_collision');
         }
 
-        $pattern = "/^(?<indent>[ \\t]*)yield new ScenarioDescriptor\\('(?<scenario>[a-z0-9][a-z0-9._-]{0,63})', '(?<component>[a-z0-9][a-z0-9._-]{0,63})', '(?<suite>[a-z0-9][a-z0-9._-]{0,63})', \\\$this->metadata\\(\\)\\);\\r?$/m";
-        $migrated = preg_replace_callback(
-            $pattern,
-            static fn (array $match): string => $match['indent']
-                ."yield new ScenarioDescriptor('{$match['scenario']}', '{$match['component']}', '{$match['suite']}', "
-                ."\$this->metadataFor('{$match['scenario']}'));",
-            $content,
-        );
-        if ($migrated === null || str_contains($migrated, '$this->metadata()')) {
+        $migrated = '';
+        $offset = 0;
+        $length = strlen($content);
+        while ($offset < $length) {
+            $lineFeed = strpos($content, "\n", $offset);
+            $next = $lineFeed === false ? $length : $lineFeed + 1;
+            $line = substr($content, $offset, $next - $offset);
+            $lineEnding = str_ends_with($line, "\r\n") ? "\r\n" : (str_ends_with($line, "\n") ? "\n" : '');
+            $body = $lineEnding === '' ? $line : substr($line, 0, -strlen($lineEnding));
+            if (preg_match(
+                "/^(?<indent>[ \\t]*)yield new ScenarioDescriptor\\('(?<scenario>[a-z0-9][a-z0-9._-]{0,63})', '(?<component>[a-z0-9][a-z0-9._-]{0,63})', '(?<suite>[a-z0-9][a-z0-9._-]{0,63})', \\\$this->metadata\\(\\)\\);$/D",
+                $body,
+                $match,
+            ) === 1) {
+                $body = $match['indent']
+                    ."yield new ScenarioDescriptor('{$match['scenario']}', '{$match['component']}', '{$match['suite']}', "
+                    ."\$this->metadataFor('{$match['scenario']}'));";
+            }
+            $migrated .= $body.$lineEnding;
+            $offset = $next;
+        }
+        if (str_contains($migrated, '$this->metadata()')) {
             throw TargetModuleException::because('target_module_path_collision');
         }
 

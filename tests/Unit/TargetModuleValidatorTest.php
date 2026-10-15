@@ -12,6 +12,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Mockery;
 use Nwidart\Modules\Contracts\RepositoryInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class TargetModuleValidatorTest extends TestCase
@@ -176,6 +177,121 @@ class TargetModuleValidatorTest extends TestCase
 
         $this->assertFalse($result->valid);
         $this->assertContains('acceptance_hierarchy_invalid', array_column($result->issues, 'code'));
+    }
+
+    #[DataProvider('invalidDescriptorImports')]
+    public function test_generated_descriptor_constructors_require_exact_unaliased_unique_imports(string $mutation): void
+    {
+        $creator = $this->creator();
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-1', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+        ], false);
+        $path = $this->componentPath();
+        $content = $this->files->get($path);
+        $import = 'use App\\Data\\SuiteDescriptor;';
+        $withoutImport = str_replace([$import."\r\n", $import."\n"], '', $content);
+        $content = match ($mutation) {
+            'missing' => $withoutImport,
+            'wrong-alias' => str_replace($import, 'use Vendor\\Contracts\\Suite as SuiteDescriptor;', $content),
+            'duplicate' => str_replace($import, $import.PHP_EOL.$import, $content),
+            'namespace-conflict' => str_replace(
+                [$import, 'final class BillingAcceptanceComponent'],
+                ['', 'final class SuiteDescriptor {}'.PHP_EOL.PHP_EOL.'final class BillingAcceptanceComponent'],
+                $content,
+            ),
+        };
+        $this->files->put($path, $content);
+        $targetClass = 'Modules\\ExampleTarget\\Acceptance\\Components\\Billing\\BillingAcceptanceComponent';
+
+        $result = $this->validator->validate('ExampleTarget');
+
+        $this->assertFalse($result->valid);
+        $this->assertSame(
+            ['target_module_descriptor_import_invalid'],
+            array_values(array_unique(array_column($result->issues, 'code'))),
+        );
+        $this->assertSame(
+            'app/Acceptance/Components/Billing/BillingAcceptanceComponent.php',
+            $result->issues[0]->path,
+        );
+        $this->assertFalse(class_exists($targetClass, false));
+    }
+
+    public function test_descriptor_constructor_text_in_comments_and_strings_does_not_require_imports(): void
+    {
+        $this->creator()->createComponent('ExampleTarget', 'billing', false);
+        $path = $this->componentPath();
+        $content = $this->files->get($path);
+        $content = str_replace([
+            'use App\\Data\\ScenarioDescriptor;'.PHP_EOL,
+            'use App\\Data\\SuiteDescriptor;'.PHP_EOL,
+            'use App\\Data\\VariantDescriptor;'.PHP_EOL,
+        ], '', $content);
+        $content = str_replace(
+            'final class BillingAcceptanceComponent'.PHP_EOL.'{',
+            'final class BillingAcceptanceComponent'.PHP_EOL.'{'.PHP_EOL
+                ."    private const EXAMPLE = 'new SuiteDescriptor new ScenarioDescriptor new VariantDescriptor';".PHP_EOL
+                .'    // new SuiteDescriptor; new ScenarioDescriptor; new VariantDescriptor;',
+            $content,
+        );
+
+        $result = $this->validator->validatePath(
+            new TargetModuleDefinition('ExampleTarget', 'example-app'),
+            $this->root.'/ExampleTarget',
+            ['app/Acceptance/Components/Billing/BillingAcceptanceComponent.php' => $content],
+        );
+
+        $this->assertTrue($result->valid);
+        $this->assertSame([], $result->issues);
+    }
+
+    public function test_fully_qualified_descriptor_constructor_is_rejected_outside_the_exact_emitter_shape(): void
+    {
+        $creator = $this->creator();
+        $creator->createComponent('ExampleTarget', 'billing', false);
+        $creator->importScenarios('ExampleTarget', [
+            new SourceCaseMapping('case-1', CoverageDisposition::AUTOMATED_FULL,
+                'billing', 'invoices', 'invoice-creates', 'default'),
+        ], false);
+        $path = $this->componentPath();
+        $content = str_replace(
+            'yield new SuiteDescriptor(',
+            'yield new \\App\\Data\\SuiteDescriptor(',
+            $this->files->get($path),
+        );
+        $this->files->put($path, $content);
+
+        $result = $this->validator->validate('ExampleTarget');
+        $codes = array_column($result->issues, 'code');
+
+        $this->assertFalse($result->valid);
+        $this->assertContains('acceptance_hierarchy_invalid', $codes);
+        $this->assertNotContains('target_module_descriptor_import_invalid', $codes);
+    }
+
+    public static function invalidDescriptorImports(): array
+    {
+        return [
+            'missing import' => ['missing'],
+            'wrong symbol alias' => ['wrong-alias'],
+            'duplicate import' => ['duplicate'],
+            'namespace declaration conflict' => ['namespace-conflict'],
+        ];
+    }
+
+    private function creator(): NwidartTargetModuleCreator
+    {
+        $modules = $this->modules();
+        $config = $this->config();
+
+        return new NwidartTargetModuleCreator($modules, $this->files, $config, $this->validator);
+    }
+
+    private function componentPath(): string
+    {
+        return $this->root.'/ExampleTarget/app/Acceptance/Components/Billing/BillingAcceptanceComponent.php';
     }
 
     private function modules(): RepositoryInterface

@@ -33,17 +33,21 @@ final class TargetModuleValidator
         return $this->validatePath($definition, $path);
     }
 
-    /** @param array<string, string> $componentOverrides */
+    /** @param array<string, string> $candidateFiles */
     public function validatePath(
         TargetModuleDefinition $definition,
         string $path,
-        array $componentOverrides = [],
+        array $candidateFiles = [],
     ): TargetModuleValidationData {
         [$root, $path] = $this->safePaths($definition, $path);
-        foreach ($componentOverrides as $relative => $content) {
-            if (! is_string($relative) || ! is_string($content)
-                || preg_match('#^app/Acceptance/Components/[A-Za-z0-9]+/[A-Za-z0-9]+AcceptanceComponent\.php$#D', $relative) !== 1
-                || ! $this->files->isFile($this->join($path, $relative))) {
+        foreach ($candidateFiles as $relative => $content) {
+            $component = is_string($relative)
+                && preg_match('#^app/Acceptance/Components/[A-Za-z0-9]+/[A-Za-z0-9]+AcceptanceComponent\.php$#D', $relative) === 1;
+            $scenario = is_string($relative)
+                && preg_match('#^app/Acceptance/Components/[A-Za-z0-9]+/Scenarios/[A-Za-z0-9]+\.php$#D', $relative) === 1;
+            $mapping = $relative === 'app/Acceptance/Coverage/SourceCaseMappings.php';
+            if (! is_string($relative) || ! is_string($content) || (! $component && ! $scenario && ! $mapping)
+                || (($component || $mapping) && ! $this->files->isFile($this->join($path, $relative)))) {
                 throw TargetModuleException::because('target_module_path_invalid');
             }
         }
@@ -112,7 +116,7 @@ final class TargetModuleValidator
         }
 
         $mappingRelative = 'app/Acceptance/Coverage/SourceCaseMappings.php';
-        $mapping = $this->read($path, $mappingRelative);
+        $mapping = $this->read($path, $mappingRelative, $candidateFiles);
         if ($mapping !== null && ! $this->markersValid($mapping, ['source-case-mappings'])) {
             $issues[] = new ValidationIssue('target_module_managed_region_invalid', $mappingRelative);
         }
@@ -130,12 +134,16 @@ final class TargetModuleValidator
             foreach ($this->files->allFiles($components) as $file) {
                 $relative = $this->relative($path, $file->getPathname());
                 $checked[] = $relative;
-                $content = $componentOverrides[$relative] ?? $file->getContents();
-                if (str_ends_with($relative, 'AcceptanceComponent.php')
-                    && ! $this->markersValid($content, ['suites', 'scenarios', 'variants', 'resolutions'])) {
+                $content = $candidateFiles[$relative] ?? $file->getContents();
+                $managedRegionsValid = ! str_ends_with($relative, 'AcceptanceComponent.php')
+                    || $this->markersValid($content, ['suites', 'scenarios', 'variants', 'resolutions']);
+                if (! $managedRegionsValid) {
                     $issues[] = new ValidationIssue('target_module_managed_region_invalid', $relative);
                 }
                 if (str_ends_with($relative, 'AcceptanceComponent.php')) {
+                    if ($managedRegionsValid && ! $this->descriptorImportsValid($content)) {
+                        $issues[] = new ValidationIssue('target_module_descriptor_import_invalid', $relative);
+                    }
                     $class = pathinfo($file->getFilename(), PATHINFO_FILENAME);
                     $componentKey = array_search(substr($class, 0, -strlen('AcceptanceComponent')), $componentOwners, true);
                     if (! is_string($componentKey)
@@ -144,6 +152,11 @@ final class TargetModuleValidator
                     }
                 }
             }
+        }
+        $newCandidatePaths = array_diff(array_keys($candidateFiles), $checked);
+        sort($newCandidatePaths, SORT_STRING);
+        foreach ($newCandidatePaths as $relative) {
+            $checked[] = $relative;
         }
         foreach ($componentOwners as $class) {
             $relative = 'app/Acceptance/Components/'.$class.'/'.$class.'AcceptanceComponent.php';
@@ -241,8 +254,12 @@ final class TargetModuleValidator
         return null;
     }
 
-    private function read(string $root, string $relative): ?string
+    /** @param array<string, string> $candidateFiles */
+    private function read(string $root, string $relative, array $candidateFiles = []): ?string
     {
+        if (array_key_exists($relative, $candidateFiles)) {
+            return $candidateFiles[$relative];
+        }
         $path = $this->join($root, $relative);
 
         try {
@@ -256,9 +273,138 @@ final class TargetModuleValidator
     private function markersValid(string $content, array $regions): bool
     {
         foreach ($regions as $region) {
-            if (substr_count($content, '// <tms:'.$region.'>') !== 1
-                || substr_count($content, '// </tms:'.$region.'>') !== 1
-                || strpos($content, '// <tms:'.$region.'>') > strpos($content, '// </tms:'.$region.'>')) {
+            if ($this->managedRegion($content, $region) === null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array{indent: string, lines: list<string>}|null */
+    private function managedRegion(string $content, string $region): ?array
+    {
+        $opening = '// <tms:'.$region.'>';
+        $closing = '// </tms:'.$region.'>';
+        $length = strlen($content);
+        $offset = 0;
+        $opened = false;
+        $closed = false;
+        $indent = '';
+        $lines = [];
+
+        while ($offset <= $length) {
+            $lineFeed = strpos($content, "\n", $offset);
+            $next = $lineFeed === false ? $length : $lineFeed + 1;
+            $contentEnd = $lineFeed === false ? $length : $lineFeed;
+            if ($contentEnd > $offset && $content[$contentEnd - 1] === "\r") {
+                $contentEnd--;
+            }
+            $line = substr($content, $offset, $contentEnd - $offset);
+            $trimmed = ltrim($line, " \t");
+            $isMarker = (str_starts_with($trimmed, '// <tms:') || str_starts_with($trimmed, '// </tms:'))
+                && str_ends_with($trimmed, '>');
+
+            if ((str_contains($line, $opening) && $trimmed !== $opening)
+                || (str_contains($line, $closing) && $trimmed !== $closing)) {
+                return null;
+            }
+            if ($trimmed === $opening) {
+                if ($opened || $closed) {
+                    return null;
+                }
+                $opened = true;
+                $indent = substr($line, 0, strlen($line) - strlen($trimmed));
+            } elseif ($trimmed === $closing) {
+                if (! $opened || $closed
+                    || substr($line, 0, strlen($line) - strlen($trimmed)) !== $indent) {
+                    return null;
+                }
+                $closed = true;
+            } elseif ($opened && ! $closed) {
+                if ($isMarker) {
+                    return null;
+                }
+                $lines[] = $line;
+            }
+
+            if ($lineFeed === false) {
+                break;
+            }
+            $offset = $next;
+        }
+
+        return $opened && $closed ? compact('indent', 'lines') : null;
+    }
+
+    private function descriptorImportsValid(string $content): bool
+    {
+        $descriptors = [
+            'SuiteDescriptor' => 'App\\Data\\SuiteDescriptor',
+            'ScenarioDescriptor' => 'App\\Data\\ScenarioDescriptor',
+            'VariantDescriptor' => 'App\\Data\\VariantDescriptor',
+        ];
+        $regions = [
+            'SuiteDescriptor' => 'suites',
+            'ScenarioDescriptor' => 'scenarios',
+            'VariantDescriptor' => 'variants',
+        ];
+        $imports = [];
+        $declarations = [];
+        $invalidRelatedImport = false;
+        $required = [];
+        foreach ($regions as $short => $regionName) {
+            $region = $this->managedRegion($content, $regionName);
+            if ($region === null) {
+                return false;
+            }
+            if (array_filter($region['lines'], fn (string $line): bool => trim($line) !== '') !== []) {
+                $required[$short] = true;
+            }
+        }
+
+        foreach (explode("\n", $content) as $line) {
+            $line = str_ends_with($line, "\r") ? substr($line, 0, -1) : $line;
+            $trimmed = trim($line);
+            if (preg_match('/^(?:final\s+)?(?:class|interface|trait|enum)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\b/', $trimmed, $declaration) === 1) {
+                $declarations[$declaration['name']] = true;
+            }
+            if (! str_starts_with($trimmed, 'use ')) {
+                continue;
+            }
+            $import = substr($trimmed, 4, -1);
+            if (! str_ends_with($trimmed, ';')
+                || preg_match('/^(?<name>[A-Za-z_][A-Za-z0-9_\\\\]*)(?:\s+as\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*))?$/i', $import, $match) !== 1) {
+                foreach ($descriptors as $short => $fqcn) {
+                    $invalidRelatedImport = $invalidRelatedImport
+                        || str_contains($import, $short)
+                        || str_contains($import, $fqcn);
+                }
+
+                continue;
+            }
+            $fqcn = ltrim($match['name'], '\\');
+            $separator = strrpos($fqcn, '\\');
+            $alias = ($match['alias'] ?? '') !== ''
+                ? $match['alias']
+                : ($separator === false ? $fqcn : substr($fqcn, $separator + 1));
+            if (isset($descriptors[$alias]) || in_array($fqcn, $descriptors, true)) {
+                $imports[$alias][] = [
+                    'fqcn' => $fqcn,
+                    'aliased' => ($match['alias'] ?? '') !== '',
+                ];
+            }
+        }
+
+        if ($invalidRelatedImport) {
+            return false;
+        }
+        foreach (array_keys($required) as $short) {
+            $matches = $imports[$short] ?? [];
+            if (count($matches) !== 1
+                || $matches[0]['fqcn'] !== $descriptors[$short]
+                || $matches[0]['aliased']
+                || isset($declarations[$short])) {
                 return false;
             }
         }
@@ -290,47 +436,85 @@ final class TargetModuleValidator
         array &$scenarios,
         array &$variants,
     ): bool {
-        preg_match_all("/SuiteDescriptor\\('([^']+)', '([^']+)'\\)/", $content, $suiteMatches, PREG_SET_ORDER);
-        foreach ($suiteMatches as $match) {
-            if ($match[2] !== $componentKey || isset($suites[$match[1]])) {
-                return false;
-            }
-            $suites[$match[1]] = $componentKey;
-        }
-        preg_match_all(
-            "/ScenarioDescriptor\\('([^']+)', '([^']+)', '([^']+)', \\\$this->metadataFor\\('([^']+)'\\)\\)/",
-            $content,
-            $scenarioMatches,
-            PREG_SET_ORDER,
-        );
-        if (substr_count($content, 'new ScenarioDescriptor(') !== count($scenarioMatches)) {
+        $suiteRegion = $this->managedRegion($content, 'suites');
+        $scenarioRegion = $this->managedRegion($content, 'scenarios');
+        $variantRegion = $this->managedRegion($content, 'variants');
+        $resolutionRegion = $this->managedRegion($content, 'resolutions');
+        if ($suiteRegion === null || $scenarioRegion === null || $variantRegion === null || $resolutionRegion === null) {
             return false;
         }
-        foreach ($scenarioMatches as $match) {
-            $owner = $match[2]."\0".$match[3];
+
+        $key = '[a-z0-9][a-z0-9._-]{0,63}';
+        $suitePattern = '/^'.preg_quote($suiteRegion['indent'], '/')
+            ."yield new SuiteDescriptor\\('(?<suite>{$key})', '(?<component>{$key})'\\);$/D";
+        foreach ($suiteRegion['lines'] as $line) {
+            if (preg_match($suitePattern, $line, $match) !== 1
+                || $match['component'] !== $componentKey
+                || isset($suites[$match['suite']])) {
+                return false;
+            }
+            $suites[$match['suite']] = $componentKey;
+        }
+
+        $scenarioPattern = '/^'.preg_quote($scenarioRegion['indent'], '/')
+            ."yield new ScenarioDescriptor\\('(?<scenario>{$key})', '(?<component>{$key})', '(?<suite>{$key})', "
+            ."\\\$this->metadataFor\\('(?<metadata>{$key})'\\)\\);$/D";
+        foreach ($scenarioRegion['lines'] as $line) {
+            if (preg_match($scenarioPattern, $line, $match) !== 1) {
+                return false;
+            }
+            $owner = $match['component']."\0".$match['suite'];
             $classCollision = false;
             foreach (array_keys($scenarios) as $scenarioKey) {
-                if (Str::studly($scenarioKey) === Str::studly($match[1])) {
+                if (Str::studly($scenarioKey) === Str::studly($match['scenario'])) {
                     $classCollision = true;
                     break;
                 }
             }
-            if ($match[1] !== $match[4] || $match[2] !== $componentKey || ($suites[$match[3]] ?? null) !== $componentKey
-                || isset($scenarios[$match[1]]) || $classCollision) {
+            if ($match['scenario'] !== $match['metadata']
+                || $match['component'] !== $componentKey
+                || ($suites[$match['suite']] ?? null) !== $componentKey
+                || isset($scenarios[$match['scenario']])
+                || $classCollision) {
                 return false;
             }
-            $scenarios[$match[1]] = $owner;
+            $scenarios[$match['scenario']] = $owner;
         }
-        preg_match_all("/\\\$scenarioKey === '([^']+)'\\) \\{ yield new VariantDescriptor\\('([^']+)'\\); \\}/", $content, $variantMatches, PREG_SET_ORDER);
-        foreach ($variantMatches as $match) {
-            $identity = $match[1]."\0".$match[2];
-            if (! isset($scenarios[$match[1]]) || isset($variants[$identity])) {
+
+        $variantPattern = '/^'.preg_quote($variantRegion['indent'], '/')
+            ."if \\(\\\$scenarioKey === '(?<scenario>{$key})'\\) \\{ yield new VariantDescriptor\\('(?<variant>{$key})'\\); \\}$/D";
+        foreach ($variantRegion['lines'] as $line) {
+            if (preg_match($variantPattern, $line, $match) !== 1) {
+                return false;
+            }
+            $identity = $match['scenario']."\0".$match['variant'];
+            if (! isset($scenarios[$match['scenario']]) || isset($variants[$identity])) {
                 return false;
             }
             $variants[$identity] = $componentKey;
         }
 
-        return true;
+        $resolutionPattern = '/^'.preg_quote($resolutionRegion['indent'], '/')
+            ."if \\(\\\$suiteKey === '(?<suite>{$key})' && \\\$scenarioKey === '(?<scenario>{$key})' "
+            ."&& \\\$variantKey === '(?<variant>{$key})'\\) \\{ return new \\\\(?<class>[A-Za-z_][A-Za-z0-9_\\\\]*); \\}$/D";
+        $resolutions = [];
+        foreach ($resolutionRegion['lines'] as $line) {
+            if (preg_match($resolutionPattern, $line, $match) !== 1) {
+                return false;
+            }
+            $identity = $match['scenario']."\0".$match['variant'];
+            if (($scenarios[$match['scenario']] ?? null) !== $componentKey."\0".$match['suite']
+                || ! isset($variants[$identity])
+                || isset($resolutions[$identity])) {
+                return false;
+            }
+            $resolutions[$identity] = true;
+        }
+
+        return count($resolutions) === count(array_filter(
+            $variants,
+            fn (string $owner): bool => $owner === $componentKey,
+        ));
     }
 
     /**
@@ -346,11 +530,14 @@ final class TargetModuleValidator
         array $scenarios,
         array $variants,
     ): bool {
-        $count = substr_count($content, 'new SourceCaseMapping(');
+        $region = $this->managedRegion($content, 'source-case-mappings');
+        if ($region === null) {
+            return false;
+        }
         $key = "(?:null|'[a-z0-9][a-z0-9._-]{0,63}')";
         $reason = "(?:null|'(?:\\\\['\\\\]|[^'\\\\\\x00-\\x1F\\x7F])*')";
         $list = "\\[(?:'[a-z0-9][a-z0-9._-]{0,63}'(?:, '[a-z0-9][a-z0-9._-]{0,63}')*)?\\]";
-        $pattern = '~^[ \\t]*new SourceCaseMapping\\('
+        $pattern = '~^'.preg_quote($region['indent'], '~').'new SourceCaseMapping\\('
             ."sourceCaseId: '(?<source>[A-Za-z0-9][A-Za-z0-9._:-]{0,127})', "
             .'disposition: CoverageDisposition::(?<disposition>AUTOMATED_FULL|AUTOMATED_PARTIAL|MERGED_EQUIVALENT|EXCLUDED_NO_RELIABLE_EXECUTOR|EXCLUDED_HUMAN_JUDGMENT), '
             ."componentKey: (?<component>{$key}), suiteKey: (?<suite>{$key}), "
@@ -358,15 +545,14 @@ final class TargetModuleValidator
             ."replacementComponentKey: (?<replacement_component>{$key}), replacementSuiteKey: (?<replacement_suite>{$key}), "
             ."replacementScenarioKey: (?<replacement_scenario>{$key}), replacementVariantKey: (?<replacement_variant>{$key}), "
             ."reason: (?<reason>{$reason}), coveredAssertions: (?<covered>{$list}), "
-            ."uncoveredAssertions: (?<uncovered>{$list})\\),[ \\t]*\\r?$~m";
-        preg_match_all($pattern, $content, $matches, PREG_SET_ORDER);
-        if ($count !== count($matches)) {
-            return false;
-        }
+            ."uncoveredAssertions: (?<uncovered>{$list})\\),$~D";
 
         $sources = [];
         $identities = [];
-        foreach ($matches as $match) {
+        foreach ($region['lines'] as $line) {
+            if (preg_match($pattern, $line, $match) !== 1) {
+                return false;
+            }
             try {
                 $mapping = new SourceCaseMapping(
                     $match['source'],

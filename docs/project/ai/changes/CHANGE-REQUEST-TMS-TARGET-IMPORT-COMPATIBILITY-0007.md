@@ -6,7 +6,7 @@ Make target scenario imports runtime-resolvable and scale-validatable before own
 
 ## 2. Status
 
-Partially implemented — Decisions 0018–0019 and Remediations 0003–0004 corrected and validated the retained DK descriptor imports and generic CLI test isolation; the complete suite now passes. The per-scenario metadata/replay-prevention slice is accepted through Change Request 0009 and Pack 0019. Draft `REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006` is execution-normalized for descriptor-resolution prevention, canonical generated-format policy, bounded managed-region parsing and default-limit scale proof; source execution remains separately gated.
+Shared hardening implemented and accepted — Decisions 0018–0019 and Remediations 0003–0004 corrected the retained DK descriptor imports and generic CLI test isolation. Remediation 0006 Run 001 implemented and validated shared descriptor-resolution prevention, canonical generated-format validation, bounded managed-region parsing, and synthetic default-limit 139/24,668 scale proof. Scoped, DK, and final repository-wide validation pass; only the separately gated real DK Pack 0003 re-run remains before this Change Request can be closed.
 
 ## 3. Related Release / Phase
 
@@ -27,7 +27,7 @@ The operator-approved targeted remediation must:
 3. re-run the affected DK runtime catalog and coverage validation;
 4. isolate generic CLI presentation/JSON tests from the real 24,668-variant catalog without changing production listing limits, then re-run the complete suite.
 
-The remaining proposed shared remediation must separately:
+Remediation 0006 implements the remaining shared hardening by:
 
 1. make target-module validation or import preflight reject an owner component whose generated descriptor references cannot resolve;
 2. define and validate the supported formatting policy for large generated managed regions, including whether they are exempt from ordinary Pint formatting or must be emitted in a formatter-compatible representation;
@@ -55,18 +55,19 @@ Affected areas:
 
 ## 8. Affected Files
 
-The approved targeted remediation scope is defined by Remediations 0003–0004 and includes the DK component, two generic CLI contract tests, and directly related lifecycle records. Expected candidates for the still-proposed shared follow-up are:
+The approved targeted remediation scope is defined by Remediations 0003–0004 and includes the DK component, two generic CLI contract tests, and directly related lifecycle records. The shared follow-up executed through Remediation 0006 includes:
 
 - `app/Acceptance/Modules/NwidartTargetModuleCreator.php`;
 - `app/Acceptance/Modules/TargetModuleValidator.php`;
+- `app/Acceptance/Operations/Data/ValidationIssue.php`;
 - `tests/Unit/TargetModuleCreatorTest.php`;
 - `tests/Unit/TargetModuleValidatorTest.php`;
-- focused shared importer/validator tests;
+- `tests/Unit/TargetModuleImportScaleTest.php`;
 - directly related future Change, Remediation, Pack, Run, and index records.
 
 The exact per-scenario metadata migration files are listed in project Pack 0019 and are not an expansion of this Change Request's unresolved scale/format scope.
 
-Decisions 0018–0019 and Remediations 0003–0004 authorize only the exact DK import correction, two-test isolation, and their validation. They do not authorize shared production-source changes.
+Decisions 0018–0019 and Remediations 0003–0004 authorize only the exact DK import correction, two-test isolation, and their validation. The shared production-source changes were separately authorized through normalized Remediation 0006 on 2026-10-15.
 
 ## 9. Backward Compatibility
 
@@ -78,20 +79,20 @@ Medium. The runtime correction is small, but the prevention belongs to a shared 
 
 ## 11. Migration or Remediation Needed
 
-Yes. Project Remediation 0003 owns the accepted target-specific correction. Draft Remediation 0006 now owns the proposed shared prevention and scale/format hardening and requires separate execution approval.
+Yes. Project Remediation 0003 owns the accepted target-specific correction. Remediation 0006 Run 001 implements the accepted shared prevention and scale/format hardening. The real DK Pack 0003 re-run remains separately gated.
 
 ## 12. Required Human Approval
 
-The operator approved retention of the safe applied DK Pack 0003 output, the exact Remediation 0003 import correction, and its validation on 2026-10-11. Shared hardening, final result acceptance, Run creation, and commit remain separate gates.
+The operator approved retention of the safe applied DK Pack 0003 output, the exact Remediation 0003 import correction, and its validation on 2026-10-11. The operator separately approved Remediation 0006 source execution and its normalized validation-issue registry scope on 2026-10-15, then accepted the completed validation/cleanup result and authorized commit on 2026-10-15.
 
 ## 13. Acceptance Criteria
 
 - [x] the retained DK generated/imported component resolves all shared descriptor classes at runtime;
-- [ ] validator or preflight fails safely before write when descriptor resolution is missing — shared follow-up;
+- [x] validator or preflight fails safely before write when descriptor resolution is missing;
 - [x] the corrected DK catalog reports version `v3`, 10 suites, 139 scenarios, and 24,668 variants;
 - [x] coverage reports exactly 24,668 `automated_full` mappings and zero other dispositions;
-- [ ] the accepted 25 chunks apply/replay idempotently without an undeclared PCRE failure mode — shared follow-up;
-- [ ] the generated-source formatting policy is explicit and its scoped validation passes — shared follow-up;
+- [ ] the accepted 25 chunks apply/replay idempotently without an undeclared PCRE failure mode — synthetic 139/24,668 proof passes, but real DK re-apply was outside Remediation 0006 authorization;
+- [x] the generated-source formatting policy is explicit and its scoped validation passes;
 - [x] all Pack 0003 focused and affected regression tests pass;
 - [x] the complete suite passes after generic CLI contract tests receive deterministic registry input;
 - [x] no executable scenario behavior or external I/O is introduced;
@@ -103,12 +104,12 @@ The operator chose to retain the safe partial import. Remediation 0003 rollback 
 
 ## 15. Final Decision
 
-Targeted DK correction was approved on 2026-10-11. Shared prevention and scale/format hardening are assigned to normalized draft Remediation 0006 and remain pending source execution and acceptance.
+Targeted DK correction was approved on 2026-10-11. Shared prevention and scale/format hardening were executed, validated, and accepted through Remediation 0006 Run 001 on 2026-10-15; the final repository-wide suite passed 846 tests and 81,530 assertions. The real DK Pack 0003 re-run remains separately gated before final Change Request closure.
 
 ## 16. Required remediation
 
-`docs/project/ai/remediations/REMEDIATION-PACK-TMS-DK-DESCRIPTOR-IMPORTS-0003.md` owns the accepted target-specific correction. `docs/project/ai/remediations/REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006.md` owns the remaining shared items.
+`docs/project/ai/remediations/REMEDIATION-PACK-TMS-DK-DESCRIPTOR-IMPORTS-0003.md` owns the accepted target-specific correction. `docs/project/ai/remediations/REMEDIATION-PACK-TMS-TARGET-IMPORT-HARDENING-0006.md` and Run 001 own the implemented shared hardening and its pending acceptance/follow-up evidence.
 
 ## 17. Notes
 
-The Decision-0017 synthetic/local exception is unrelated to this defect and remains unchanged. No sensitive-data protection capability is introduced by this Change Request.
+The Decision-0017 synthetic/local exception is unrelated to this defect and remains unchanged. No sensitive-data protection capability is introduced by this Change Request. The earlier external full-suite blocker was resolved without an out-of-scope Remediation 0006 source change.

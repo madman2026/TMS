@@ -10,7 +10,8 @@ final readonly class ValidationIssue
         'target_module_required_path_missing', 'target_module_manifest_invalid',
         'target_module_composer_invalid', 'target_module_provider_invalid',
         'target_module_registration_missing', 'target_module_acceptance_app_invalid',
-        'target_module_managed_region_invalid', 'target_module_surface_forbidden',
+        'target_module_managed_region_invalid', 'target_module_descriptor_import_invalid',
+        'target_module_surface_forbidden',
         'acceptance_hierarchy_invalid', 'acceptance_source_mapping_invalid',
     ];
 
