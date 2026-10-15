@@ -41,9 +41,10 @@ final class AcceptanceExecutionService
         ?ExecutorTraceContext $trace = null,
         ?Closure $isCancelled = null,
         ?Closure $onExecutorEntry = null,
+        ?string $lifecycleId = null,
     ): RunOperationData|TargetResourceLifecycleData {
         $context = new TargetContext(
-            $operationId,
+            $lifecycleId ?? $operationId,
             $correlationId,
             $prerequisites->requestId,
             $identity->appKey,

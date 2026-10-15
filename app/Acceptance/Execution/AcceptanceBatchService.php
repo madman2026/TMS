@@ -458,6 +458,7 @@ final class AcceptanceBatchService
                 fn (): bool => AcceptanceBatch::query()->whereKey($batch->getKey())
                     ->whereNotNull('cancel_requested_at')->exists(),
                 fn (): bool => $this->markExecutorEntered((int) $attempt->getKey(), $attempt->execution_token),
+                $attempt->execution_token,
             );
             $this->recordResult($itemId, $attemptId, $result);
         } catch (PrerequisiteException $exception) {
@@ -827,6 +828,7 @@ final class AcceptanceBatchService
             $failed = $batch->items()->where('state', BatchItemState::FAILED)->count();
             $targetBatch = $failed > 0 ? BatchState::COMPLETED_WITH_FAILURES : BatchState::COMPLETED;
             $targetOperation = $failed > 0 ? OperationState::FAILED : OperationState::SUCCEEDED;
+            [$errorCode, $retryable, $permanent, $adminActionRequired] = $this->aggregateFailure($batch, $failed);
             $this->states->batch($batch->state, $targetBatch);
             $this->states->operation($operation->state, $targetOperation);
             $previousBatchState = $batch->state->value;
@@ -839,9 +841,10 @@ final class AcceptanceBatchService
             ]);
             $operation->update([
                 'state' => $targetOperation,
-                'error_code' => $failed > 0 ? 'acceptance_command_failed' : null,
-                'retryable' => $failed > 0 ? false : null,
-                'permanent' => $failed > 0 ? true : null,
+                'error_code' => $errorCode,
+                'retryable' => $retryable,
+                'permanent' => $permanent,
+                'admin_action_required' => $adminActionRequired,
                 'finished_at' => now(),
                 'lock_version' => $operation->lock_version + 1,
             ]);
@@ -1156,9 +1159,38 @@ final class AcceptanceBatchService
             'target_not_ready', 'acceptance_batch_dispatch_failed', 'acceptance_attempt_timeout' => [true, false, false],
             'fixture_setup_failed', 'cleanup_failed', 'acceptance_browser_start_failed',
             'acceptance_result_persistence_failed', 'http_transport_failed' => [true, false, true],
-            'resource_unavailable' => [false, true, true],
+            'resource_unavailable', 'unsafe_target' => [false, true, true],
             default => [false, true, false],
         };
+    }
+
+    /** @return array{?string, ?bool, ?bool, bool} */
+    private function aggregateFailure(AcceptanceBatch $batch, int $failed): array
+    {
+        if ($failed === 0) {
+            return [null, null, null, false];
+        }
+
+        $failedItems = $batch->items()->where('state', BatchItemState::FAILED->value);
+        $hasMissingCode = (clone $failedItems)
+            ->where(function ($query): void {
+                $query->whereNull('error_code')->orWhere('error_code', '');
+            })
+            ->exists();
+        $errorCodes = (clone $failedItems)
+            ->whereNotNull('error_code')
+            ->where('error_code', '!=', '')
+            ->distinct()
+            ->limit(2)
+            ->pluck('error_code');
+        if ($hasMissingCode || $errorCodes->count() !== 1) {
+            return ['acceptance_command_failed', null, null, true];
+        }
+
+        $errorCode = (string) $errorCodes->first();
+        [$retryable, $permanent, $adminActionRequired] = $this->failureClassification($errorCode);
+
+        return [$errorCode, $retryable, $permanent, $adminActionRequired];
     }
 
     private function emitState(

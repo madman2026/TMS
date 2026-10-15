@@ -292,9 +292,7 @@ abstract class AcceptanceCommand extends Command
     {
         $path = $this->option('prerequisites');
         if ($path === null || $path === '') {
-            if (! $interactive || ! confirm('Load prerequisite references from a JSON file?', default: false)) {
-                return [];
-            }
+            return [];
         }
         $document = $this->jsonDocument('prerequisites', self::MAX_DOCUMENT_BYTES);
         if (! array_is_list($document)) {

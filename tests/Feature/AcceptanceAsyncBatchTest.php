@@ -13,9 +13,29 @@ use App\Acceptance\Execution\Enums\BatchState;
 use App\Acceptance\Execution\Enums\OperationState;
 use App\Acceptance\Operations\AcceptanceOperationService;
 use App\Acceptance\Operations\Data\OperationRequest;
+use App\Acceptance\Prerequisites\Contracts\PrerequisiteReferenceResolver;
 use App\Acceptance\Prerequisites\Data\InputRequirement;
+use App\Acceptance\Prerequisites\Data\PrerequisiteExecutionData;
+use App\Acceptance\Prerequisites\Data\PrerequisiteReferenceContext;
 use App\Acceptance\Prerequisites\Data\PrerequisiteSchema;
+use App\Acceptance\Prerequisites\Enums\InputResolution;
+use App\Acceptance\Prerequisites\Enums\InputSensitivity;
 use App\Acceptance\Prerequisites\Enums\InputType;
+use App\Acceptance\Prerequisites\PrerequisiteReferenceResolverRegistry;
+use App\Acceptance\Targets\Contracts\TargetAccountResolver;
+use App\Acceptance\Targets\Contracts\TargetCleanup;
+use App\Acceptance\Targets\Contracts\TargetFixtureManager;
+use App\Acceptance\Targets\Contracts\TargetOracle;
+use App\Acceptance\Targets\Contracts\TargetReadinessProbe;
+use App\Acceptance\Targets\Data\CleanupResult;
+use App\Acceptance\Targets\Data\ResourceProvisionResult;
+use App\Acceptance\Targets\Data\TargetContext;
+use App\Acceptance\Targets\Data\TargetEnvironment;
+use App\Acceptance\Targets\Data\TargetExecutionOutcome;
+use App\Acceptance\Targets\Data\TargetOracleResult;
+use App\Acceptance\Targets\Data\TargetReadinessResult;
+use App\Acceptance\Targets\TargetResourceAdapters;
+use App\Acceptance\Targets\TargetResourceRegistry;
 use App\Contracts\AcceptanceComponentProvider;
 use App\Data\ComponentDescriptor;
 use App\Data\ScenarioDescriptor;
@@ -24,7 +44,9 @@ use App\Data\VariantDescriptor;
 use App\Events\AcceptanceExecutionStateChanged;
 use App\Jobs\RunAcceptanceBatch;
 use App\Models\AcceptanceBatch;
+use App\Models\AcceptanceBatchItem;
 use App\Models\AcceptanceExecutionAttempt;
+use App\Models\AcceptanceOperationRequest;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\AcceptanceAppRegistry;
@@ -103,6 +125,94 @@ class AcceptanceAsyncBatchTest extends TestCase
         $this->assertSame(OperationState::AWAITING_INPUT, $result->data->operationState);
         $this->assertSame(1, $result->data->blockedCount);
         Queue::assertNothingPushed();
+    }
+
+    public function test_automatic_references_are_created_and_attached_for_every_selected_variant(): void
+    {
+        Queue::fake();
+        $schema = new PrerequisiteSchema('automatic-v1', [
+            new InputRequirement(
+                'credential',
+                InputType::SECRET_REFERENCE,
+                InputSensitivity::SECRET_REFERENCE,
+                resolution: InputResolution::APP_REFERENCE,
+            ),
+        ]);
+        $this->registerProvider($schema, ['variant-1', 'variant-2', 'variant-3']);
+        $this->app->make(PrerequisiteReferenceResolverRegistry::class)->register(
+            'app-a',
+            new class implements PrerequisiteReferenceResolver
+            {
+                public function resolve(PrerequisiteReferenceContext $context): ?string
+                {
+                    return 'app-secret://app-a/batch-reference';
+                }
+            },
+        );
+        $profile = Profile::factory()->for(User::factory())->create();
+
+        $exitCode = Artisan::call('acceptance:batch:start', [
+            'profile' => (string) $profile->id,
+            'mode' => 'async',
+            '--app' => ['app-a'],
+            '--component' => ['component-a'],
+            '--suite' => ['suite-a'],
+            '--scenario' => ['scenario-a'],
+            '--json' => true,
+            '--no-interaction' => true,
+        ]);
+        $result = json_decode(trim(Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame('succeeded', $result['status']);
+        $this->assertSame(BatchState::QUEUED->value, $result['data']['batch_state']);
+        $this->assertSame(OperationState::QUEUED->value, $result['data']['operation_state']);
+        $this->assertSame(3, $result['data']['pending_count']);
+        $batchId = $result['data']['batch_id'];
+        $requestIds = AcceptanceBatchItem::query()
+            ->where('batch_id', $batchId)
+            ->orderBy('ordinal')
+            ->pluck('acceptance_operation_request_id')
+            ->all();
+        $this->assertCount(3, array_unique($requestIds));
+        $this->assertFalse(in_array(null, $requestIds, true));
+        $this->assertSame(3, AcceptanceOperationRequest::query()->whereIn('id', $requestIds)->count());
+        $this->assertDatabaseCount('acceptance_operation_inputs', 3);
+        $this->assertDatabaseHas('acceptance_operation_inputs', [
+            'secret_reference' => 'app-secret://app-a/batch-reference',
+            'submitted_by_type' => 'app_resolver',
+            'submitted_by_reference' => 'app-a-resolver',
+        ]);
+        Queue::assertPushed(RunAcceptanceBatch::class);
+    }
+
+    public function test_interactive_start_does_not_prompt_for_an_unsupplied_prerequisite_file(): void
+    {
+        Queue::fake();
+        $this->registerProvider(PrerequisiteSchema::none());
+        $profile = Profile::factory()->for(User::factory())->create();
+
+        $this->artisan('acceptance:batch:start', [
+            'profile' => (string) $profile->id,
+            'mode' => 'async',
+            '--app' => ['app-a'],
+            '--component' => ['component-a'],
+            '--suite' => ['suite-a'],
+            '--scenario' => ['scenario-a'],
+            '--interactive' => true,
+        ])
+            ->expectsChoice('Configure optional catalog filters?', [], [
+                'variant' => 'Variant keys',
+                'capability' => 'Capabilities',
+                'tag' => 'Tags',
+                'disposition' => 'Automation dispositions',
+                'evidence-mode' => 'Evidence modes',
+                'limit' => 'Maximum matched items',
+            ])
+            ->expectsOutputToContain('Operation completed successfully.')
+            ->assertSuccessful();
+
+        Queue::assertPushed(RunAcceptanceBatch::class);
     }
 
     public function test_resume_dispatches_after_the_prerequisite_request_becomes_ready(): void
@@ -370,8 +480,67 @@ class AcceptanceAsyncBatchTest extends TestCase
         $this->assertSame(BatchState::COMPLETED_WITH_FAILURES, $result->data->batchState);
         $this->assertSame(OperationState::FAILED, $result->data->operationState);
         $this->assertSame(1, $result->data->failedCount);
+        $this->assertSame('resource_unavailable', $result->errorCode);
+        $this->assertFalse($result->retryable);
+        $this->assertTrue($result->permanent);
+        $this->assertTrue($result->adminActionRequired);
         $this->assertDatabaseCount('acceptance_execution_attempts', 1);
         Queue::assertNothingPushed();
+    }
+
+    public function test_sync_mode_promotes_a_homogeneous_unsafe_target_failure(): void
+    {
+        Queue::fake();
+        $this->registerProvider(PrerequisiteSchema::none());
+        $this->registerReadinessAdapter(
+            static fn (TargetContext $context): TargetReadinessResult => TargetReadinessResult::unsafe(
+                TargetEnvironment::PRODUCTION,
+            ),
+        );
+        $profile = Profile::factory()->for(User::factory())->create();
+
+        $result = app(AcceptanceOperationService::class)->execute(new OperationRequest('acceptance.batch.start', [
+            'app' => ['app-a'],
+            'profile_id' => $profile->id,
+            'mode' => 'sync',
+        ]));
+
+        $this->assertSame('failed', $result->status);
+        $this->assertSame('unsafe_target', $result->errorCode);
+        $this->assertFalse($result->retryable);
+        $this->assertTrue($result->permanent);
+        $this->assertTrue($result->adminActionRequired);
+    }
+
+    public function test_sync_mode_keeps_a_mixed_failure_aggregate_generic(): void
+    {
+        Queue::fake();
+        $this->registerProvider(PrerequisiteSchema::none(), ['variant-a', 'variant-b']);
+        $lifecycleIds = [];
+        $this->registerReadinessAdapter(
+            static function (TargetContext $context) use (&$lifecycleIds): TargetReadinessResult {
+                $lifecycleIds[] = $context->lifecycleId;
+
+                return $context->variantKey === 'variant-a'
+                    ? TargetReadinessResult::unsafe(TargetEnvironment::PRODUCTION)
+                    : TargetReadinessResult::notReady(TargetEnvironment::TESTING);
+            },
+        );
+        $profile = Profile::factory()->for(User::factory())->create();
+
+        $result = app(AcceptanceOperationService::class)->execute(new OperationRequest('acceptance.batch.start', [
+            'app' => ['app-a'],
+            'profile_id' => $profile->id,
+            'mode' => 'sync',
+        ]));
+
+        $this->assertSame('failed', $result->status);
+        $this->assertSame('acceptance_command_failed', $result->errorCode);
+        $this->assertNull($result->retryable);
+        $this->assertNull($result->permanent);
+        $this->assertTrue($result->adminActionRequired);
+        $this->assertCount(2, array_unique($lifecycleIds));
+        $this->assertNotContains($result->operationId, $lifecycleIds);
     }
 
     public function test_database_queue_worker_processes_a_bounded_batch_without_target_io(): void
@@ -488,6 +657,49 @@ class AcceptanceAsyncBatchTest extends TestCase
         app(AcceptanceAppRegistry::class)->register($provider);
 
         return $provider;
+    }
+
+    /** @param  \Closure(TargetContext): TargetReadinessResult  $readiness */
+    private function registerReadinessAdapter(\Closure $readiness): void
+    {
+        $adapter = new class($readiness) implements TargetAccountResolver, TargetCleanup, TargetFixtureManager, TargetOracle, TargetReadinessProbe
+        {
+            public function __construct(private readonly \Closure $readiness) {}
+
+            public function probe(TargetContext $context): TargetReadinessResult
+            {
+                return ($this->readiness)($context);
+            }
+
+            public function resolve(
+                TargetContext $context,
+                PrerequisiteExecutionData $prerequisites,
+            ): ResourceProvisionResult {
+                return ResourceProvisionResult::unavailable();
+            }
+
+            public function provision(
+                TargetContext $context,
+                PrerequisiteExecutionData $prerequisites,
+            ): ResourceProvisionResult {
+                return ResourceProvisionResult::fixtureFailed();
+            }
+
+            public function evaluate(
+                TargetContext $context,
+                TargetExecutionOutcome $outcome,
+            ): TargetOracleResult {
+                return TargetOracleResult::failed();
+            }
+
+            public function cleanup(TargetContext $context, int $timeoutMs): CleanupResult
+            {
+                return CleanupResult::success([]);
+            }
+        };
+        $registry = new TargetResourceRegistry;
+        $registry->register('app-a', new TargetResourceAdapters($adapter, $adapter, $adapter, $adapter, $adapter));
+        $this->app->instance(TargetResourceRegistry::class, $registry);
     }
 
     private function runOneAcceptanceJob(): void
