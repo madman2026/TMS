@@ -1,6 +1,10 @@
 # REMEDIATION-PACK-TMS-EXECUTOR-ROUTING-0007 — Executor-neutral application handoff
 
-Status: `blocked draft — normalize after accepted DK Pack 0004 and current capability inventory; execute before API/HTTP stage-15 child Packs`
+Status: `blocked draft — ND human-v1.1 amendment implemented/offline validated on 2026-10-16; amendment accepted 2026-10-17; exact DK successor mapping migration required before normalization`
+
+Preflight outcome (2026-10-16): the operator authorized proceeding, but Decision-0024 prerequisite inspection found material navigation/source drift and the upstream offline validator failed with `HAC-V05 snapshot/changed-paths contract_snapshot_source_drift`. No implementation started. See `docs/project/ai/reviews/source-updates/SOURCE-UPDATE-REVIEW-ND-CONTRACT-2026-10-16.md` for evidence and the required owner-successor sequence. This authorization does not mark the draft ready or waive unresolved prerequisites.
+
+Resumed disposition (2026-10-16): the operator explicitly authorized the cross-repository source recheck and contract update. ND Remediation 0067 now supplies human-v1.1; DK reference `ND-CONTRACT-AMENDMENT-0002.md` records the precise consumer facts and migration boundary. Core Browser/HTTP support exists, while application handoff still forces Browser and only 21 DK variants are executable. Amendment acceptance completed on 2026-10-17; exact DK obligation/context mapping remains a prerequisite; no runtime implementation or broad import is performed by the contract refresh.
 
 ## 1. Task ID
 

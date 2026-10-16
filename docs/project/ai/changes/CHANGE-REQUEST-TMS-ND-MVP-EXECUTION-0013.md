@@ -86,3 +86,9 @@ Approved for planning and later separately gated implementation.
 ## 17. Notes
 
 This Change Request does not authorize Pack execution, raising safety limits, staging/production access, retained evidence, a second user, real data, real credentials or real Provider traffic.
+
+2026-10-16 prerequisite review: after operator authorization to proceed with Remediation 0007, current N-D source/export drift was confirmed before implementation. `docs/project/ai/reviews/source-updates/SOURCE-UPDATE-REVIEW-ND-CONTRACT-2026-10-16.md` records the failing offline validator, navigation applicability delta and owner contract-refresh/DK successor-import prerequisites. This Change remains planning-approved; the finding does not expand its source scope or accept an implementation result.
+
+Resumed source recheck (2026-10-16): direct operator authorization covers the contract update. ND Change 0071 / Remediation 0067 implements human-v1.1 with ten supplemental requirements, explicit base identity preservation and current TMS/DK capabilities. See DK reference `ND-CONTRACT-AMENDMENT-0002.md`. Final acceptance and exact DK mapping migration remain pending; source implementation of Remediation 0007 is not claimed.
+
+2026-10-17: the operator accepted the completed ND amendment and TMS source-review documentation and authorized scoped commits. Exact DK migration remains pending; Remediation 0007 has not been implemented or accepted.
