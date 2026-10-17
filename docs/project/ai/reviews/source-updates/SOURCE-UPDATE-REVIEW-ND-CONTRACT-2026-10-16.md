@@ -283,6 +283,11 @@ Earlier pending-acceptance text is historical chronology. DK migration and TMS
 Remediation 0007 remain unexecuted; their results and the known runtime defects
 are not accepted by this action. No push authorized.
 
+The accepted upstream commit is
+`e4e15d4bdb33e334f73706d7ca9d68038af6e8e2`. Its committed amendment README,
+data, closed schema, standalone validator and accepted Run 001 SHA-256/byte pins are
+recorded in `Modules/DK/docs/ai/references/ND-CONTRACT-AMENDMENT-0002.md`.
+
 Pre-commit TMS HEAD is `d5f60590b401f09aa75a7fc9827163c1bda4e5cb`; its changes
 since the pinned source are documentation-only operator-diagnostics planning.
 These committed changes are preserved; the runtime input pin remains unchanged.

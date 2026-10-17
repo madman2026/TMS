@@ -16,6 +16,12 @@ update conflicting contracts. No new product Canonical decision. Scoped commit a
 | TMS/Core/DK source | `e7c81af9634267847947ef79ec9ccaaf4e2dc392` |
 | Immutable base export | `7ec4b4dc8573f24252175bf9e1a21364b0a48d9c` |
 | Base runtime snapshot | `0ef0b92d9192d0162060d31efe08f55552b084f7` |
+| Accepted amendment commit | `e4e15d4bdb33e334f73706d7ca9d68038af6e8e2` |
+| Amendment README | SHA-256 `37fd3c09dfb8d9139aa3b5f686d356d68775fe5a4e0d27a4b3fc6c92fb87a0e3`; 10,537 bytes |
+| Amendment data | SHA-256 `46b2c65f22e39366ebc26651645ddc6ee0c08b9392a8121e5837304cef031b13`; 241,603 bytes |
+| Amendment schema | SHA-256 `61a198f36fe278bd3a3609ad39169ff8f6d61be77fa3343f4bf6f7fc5d247011`; 13,988 bytes |
+| Standalone validator | SHA-256 `322afd7446a80e273792377378152bb3ad6214173da8793c4229e43bb09ec8d8`; 14,360 bytes |
+| Accepted Run 001 | SHA-256 `0bb4fc10177c8eea0f1977beba15c53799c66633970d110b5778de531f43c917`; 11,316 bytes |
 
 The amendment records SHA-256 and byte lengths of all 22 committed base artifacts,
 six authority hashes and 1,126 scoped source Git blob identities. Validate both
